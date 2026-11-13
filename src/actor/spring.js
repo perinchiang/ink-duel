@@ -7,6 +7,8 @@ const LAYOUT = [
   ['crouch', 1, 'body'],
   ['lean', 1, 'body'],
   ['twist', 1, 'body'],
+  ['pelvis', 1, 'body'],
+  ['weight', 2, 'body'],
   ['tilt', 1, 'body'],
   ['head', 2, 'head'],
   ['two', 1, 'arm'],

@@ -23,6 +23,8 @@ export function makePose(o = {}) {
     crouch: 0.08,
     lean: 0.05,
     twist: 0,
+    pelvis: o.pelvis ?? (o.twist || 0) * 0.45,
+    weight: [0, 0], // pelvis translation relative to stance/root, independent of chest
     tilt: 0,
     hilt: [-0.14, 1.12, 0.36],
     dir: [0, 0.6, 0.8],
@@ -34,6 +36,7 @@ export function makePose(o = {}) {
     ...o,
   };
   p.root = [...p.root];
+  p.weight = [...p.weight];
   p.head = [...p.head];
   p.hilt = [...p.hilt];
   p.dir = norm(p.dir);
@@ -45,8 +48,8 @@ export function makePose(o = {}) {
   return p;
 }
 
-const SCALARS = ['crouch', 'lean', 'twist', 'tilt', 'two', 'sheath'];
-const VECTORS = ['root', 'hilt', 'dir', 'edge', 'lhand', 'head'];
+const SCALARS = ['crouch', 'lean', 'twist', 'pelvis', 'tilt', 'two', 'sheath'];
+const VECTORS = ['root', 'weight', 'hilt', 'dir', 'edge', 'lhand', 'head'];
 
 export function copyPose(src, out = makePose()) {
   for (const k of SCALARS) out[k] = src[k];
@@ -130,9 +133,11 @@ export function cutPoses(ux, uy) {
     hilt: [C[0] - lx * 0.3, C[1] - ly * 0.32 + 0.1, 0.06],
     dir: [-lx * 0.75, -ly * 0.75 + 0.3, -0.12],
     edge: [lx, ly, 0.2],
-    lhand: [0.2, 1.22, 0.2],
-    twist: -lx * 0.42 + 0.05,
-    crouch: 0.1,
+    lhand: [0.26, 1.28, 0.12],
+    twist: -lx * 0.52 + 0.05,
+    pelvis: -lx * 0.22,
+    weight: [0.035, -0.08],
+    crouch: 0.16,
     lean: -0.02,
     root: [0, -0.02],
   });
@@ -140,21 +145,25 @@ export function cutPoses(ux, uy) {
     hilt: [C[0] + lx * 0.06, C[1] + ly * 0.04 - 0.02, 0.58],
     dir: [lx * 0.42, ly * 0.42 + 0.05, 0.92],
     edge: [lx, ly, 0],
-    lhand: [0.22, 1.18, 0.18],
+    lhand: [0.32, 1.12, -0.08],
     twist: lx * 0.12 + 0.12,
+    pelvis: lx * 0.3 + 0.08,
+    weight: [-0.045, 0.07],
     crouch: 0.15,
     lean: 0.16,
-    root: [0, 0.26],
+    root: [0, 0.12],
   });
   const follow = makePose({
     hilt: [C[0] + lx * 0.28, C[1] + ly * 0.36 - 0.12, 0.42],
     dir: [lx * 0.85, ly * 0.85 - 0.1, 0.5],
     edge: [lx, ly, -0.4],
-    lhand: [0.24, 1.22, 0.14],
+    lhand: [0.3, 1.18, -0.13],
     twist: lx * 0.48 + 0.12,
-    crouch: 0.16,
+    pelvis: lx * 0.24 + 0.08,
+    weight: [-0.045, 0.06],
+    crouch: 0.19,
     lean: 0.22,
-    root: [0, 0.28],
+    root: [0, 0.14],
   });
   return [windup, impact, follow];
 }

@@ -13,6 +13,7 @@ import { PoseSpring } from './spring.js';
 import { makePose, copyPose } from './poses.js';
 import { torsoPattern, skirtPattern, sleevePattern } from './patterns.js';
 import { ease } from '../core/noise.js';
+import { legGeometry, solveLeg, shapeLeg } from './legs.js';
 
 const UPPER = 0.29;
 const FORE = 0.29;
@@ -75,7 +76,8 @@ export class Swordsman {
     torsoGeo.scale(1, 1, 0.72);
     this.torso = add(inkPart(torsoGeo, M.torso, line));
 
-    const skirtGeo = lathe(SKIRT, 20);
+    // Short overlapping coat hem reveals the player's trouser knees; enemy keeps his robe.
+    const skirtGeo = lathe(style === 'hat' ? SKIRT : [[0.001, -0.28], [0.27, -0.3], [0.26, -0.23], [0.2, -0.08], [0.17, 0], [0.001, 0.02]], 20);
     skirtGeo.scale(1, 1, 0.82);
     this.skirt = add(inkPart(skirtGeo, M.skirt, line));
 
@@ -107,13 +109,17 @@ export class Swordsman {
     }
 
     // arms: the forearm is the wide sleeve, flaring at the wrist with a dark cuff
-    const upperGeo = new THREE.CapsuleGeometry(0.068, UPPER - 0.1, 4, 10);
-    const foreGeo = new THREE.CylinderGeometry(0.09, 0.064, FORE - 0.04, 14);
+    const upperGeo = style === 'hat' ? new THREE.CapsuleGeometry(0.068, UPPER - 0.1, 4, 10)
+      : lathe([[0.038, -0.17], [0.073, -0.135], [0.087, -0.04], [0.079, 0.09], [0.05, 0.155]], 14);
+    const foreGeo = style === 'hat' ? new THREE.CylinderGeometry(0.09, 0.064, FORE - 0.04, 14)
+      : lathe([[0.068, -0.16], [0.075, -0.12], [0.081, 0.07], [0.094, 0.15], [0.061, 0.155]], 14);
     this.upperR = add(inkPart(upperGeo, M.limb, line));
     this.upperL = add(inkPart(upperGeo, M.limb, line));
     this.foreR = add(inkPart(foreGeo, M.sleeve, line));
     this.foreL = add(inkPart(foreGeo, M.sleeve, line));
-    const handGeo = new THREE.SphereGeometry(0.037, 12, 10);
+    const handGeo = style === 'hat' ? new THREE.SphereGeometry(0.037, 12, 10)
+      : new THREE.CapsuleGeometry(0.028, 0.045, 4, 10);
+    if (style !== 'hat') handGeo.scale(1, 1, 0.8);
     this.handR = add(inkPart(handGeo, M.skin, line));
     this.handL = add(inkPart(handGeo, M.skin, line));
 
@@ -125,6 +131,20 @@ export class Swordsman {
       { obj: this.footR, off: new THREE.Vector3(-0.13, 0, 0.14), pos: new THREE.Vector3(-0.13, 0, 0.14), from: new THREE.Vector3(), to: new THREE.Vector3(), t: 1, yaw: -0.1 },
       { obj: this.footL, off: new THREE.Vector3(0.15, 0, -0.12), pos: new THREE.Vector3(0.15, 0, -0.12), from: new THREE.Vector3(), to: new THREE.Vector3(), t: 1, yaw: 0.45 },
     ];
+
+    this.legs = [];
+    if (style !== 'hat') {
+      this.feet[0].off.set(-0.18, 0, 0.28);
+      this.feet[1].off.set(0.19, 0, -0.24);
+      for (const f of this.feet) {
+        f.pos.copy(f.off);
+        const geometry = legGeometry();
+        const mesh = add(new THREE.Mesh(geometry, M.limb));
+        // Share dynamic vertices with the outline rather than a frozen cloned hull.
+        mesh.add(new THREE.Mesh(geometry, line));
+        this.legs.push({ mesh, hip: new THREE.Vector3(), knee: new THREE.Vector3(), ankle: new THREE.Vector3() });
+      }
+    }
 
     // scabbard at the left hip; its mouth faces forward, it runs back and down
     const scabGeo = new THREE.CylinderGeometry(0.026, 0.02, SCAB_LEN, 8);
@@ -143,7 +163,7 @@ export class Swordsman {
     this.sword = add(makeSword({ bladeMat: M.blade, darkMat: M.dark, lineMat: line }));
 
     if (style === 'hat') this.ribbons = [new Ribbon({ count: 10, seg: 0.075, width: 0.04 }), new Ribbon({ count: 8, seg: 0.07, width: 0.03 })];
-    else this.ribbons = [new Ribbon({ count: 11, seg: 0.07, width: 0.032 }), new Ribbon({ count: 9, seg: 0.068, width: 0.024 })];
+    else this.ribbons = [new Ribbon({ count: 5, seg: 0.028, width: 0.025 }), new Ribbon({ count: 4, seg: 0.026, width: 0.018 })];
     this.tassel = new Ribbon({ count: 6, seg: 0.035, width: 0.018, gravity: 7 });
     for (const r of [...this.ribbons, this.tassel]) this.world.add(r.mesh);
 
@@ -230,9 +250,9 @@ export class Swordsman {
     const P = this.pts;
     P.root.set(p.root[0], 0, p.root[1]);
     const hipsY = HIP_H - p.crouch;
-    P.hips.set(P.root.x, hipsY, P.root.z);
+    P.hips.set(P.root.x + (this.style === 'hat' ? 0 : p.weight[0]), hipsY, P.root.z + (this.style === 'hat' ? 0 : p.weight[1]));
     const q = this.chestQ.setFromEuler(_e.set(p.lean, p.twist, p.tilt, 'YXZ'));
-    const hq = this.hipQ.setFromEuler(_e.set(p.lean * 0.35, p.twist * 0.45, p.tilt * 0.5, 'YXZ'));
+    const hq = this.hipQ.setFromEuler(_e.set(p.lean * 0.35, this.style === 'hat' ? p.twist * 0.45 : p.pelvis, p.tilt * 0.5, 'YXZ'));
 
     this.torso.position.copy(P.hips);
     this.torso.quaternion.copy(q);
@@ -286,6 +306,8 @@ export class Swordsman {
     _m.makeBasis(_x, _y, _z);
     this.sword.quaternion.setFromRotationMatrix(_m);
     this.sword.position.copy(P.hR);
+    // Closed palm wraps along the hilt rather than a directionless ball at the cuff.
+    if (this.style !== 'hat') this.handR.quaternion.copy(this.sword.quaternion);
     P.tip.copy(P.hR).addScaledVector(_y, TIP);
     const swordY = _y.clone();
 
@@ -303,8 +325,21 @@ export class Swordsman {
     placeSegment(this.upperL, P.shL, P.elL);
     placeSegment(this.foreL, P.elL, P.hL);
     this.handL.position.copy(P.hL);
+    if (this.style !== 'hat') {
+      this.handL.quaternion.setFromUnitVectors(UP, _v.subVectors(P.hL, P.elL).normalize());
+      if (p.two > 0.5) this.handL.quaternion.copy(this.sword.quaternion);
+      if (sh > 0.5) this.handL.quaternion.copy(this.scabbard.quaternion);
+    }
 
     this.stepFeet(dt, P, p);
+    for (let i = 0; i < this.legs.length; i++) {
+      const leg = this.legs[i], f = this.feet[i];
+      leg.hip.copy(P.hips).add(_v.set(i === 0 ? -0.13 : 0.13, -0.02, 0).applyQuaternion(hq));
+      _a.copy(f.obj.position).y += 0.075;
+      solveLeg(leg.hip, _a, i === 0 ? -1 : 1, leg.knee, leg.ankle);
+      shapeLeg(leg.mesh.geometry, leg.hip, leg.knee, leg.ankle);
+      leg.mesh.visible = !this.visual;
+    }
     this.visual?.update(p);
     this.shadow.position.set(P.hips.x, 0.004, P.hips.z + 0.04);
     const ss = 1 + p.crouch * 0.6;
@@ -331,23 +366,26 @@ export class Swordsman {
   }
 
   stepFeet(dt, P, p) {
+    if (dt <= 0) return; // hitstop freezes landing targets as well as rendered feet
     // each foot stays planted until the body has moved away from it, then steps
-    const stepping = this.feet.some((f) => f.t < 1);
+    let stepping = this.feet.some((f) => f.t < 1);
     for (const f of this.feet) {
-      _a.copy(f.off).applyAxisAngle(UP, p.twist * 0.35).add(P.root);
-      if (f.t >= 1 && !stepping && f.pos.distanceTo(_a) > 0.15) {
+      _a.copy(f.off).applyAxisAngle(UP, this.style === 'hat' ? p.twist * 0.35 : 0).add(P.root);
+      if (f.t >= 1 && !stepping && f.pos.distanceTo(_a) > (this.style === 'hat' ? 0.15 : 0.22)) {
+        stepping = true;
         f.from.copy(f.pos);
         f.to.copy(_a);
         f.t = 0;
       }
       if (f.t < 1) {
         f.t = Math.min(1, f.t + dt / 0.13);
-        f.to.lerp(_a, 0.5);
+        // Commit to the landing at takeoff; do not chase a moving target per frame.
         f.pos.lerpVectors(f.from, f.to, ease.outCubic(f.t));
         f.lift = Math.sin(Math.PI * f.t) * 0.06;
       } else f.lift = 0;
       f.obj.position.set(f.pos.x, f.lift, f.pos.z);
-      f.obj.rotation.y = f.yaw + p.twist * 0.3;
+      // Player toes stay fixed during a planted weight transfer, not chest-driven skating.
+      f.obj.rotation.y = f.yaw + (this.style === 'hat' ? p.twist * 0.3 : 0);
     }
   }
 

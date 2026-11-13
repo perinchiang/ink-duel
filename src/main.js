@@ -11,8 +11,12 @@ import { Duel, ANGLE } from './game/duel.js';
 import { Sfx } from './audio/sfx.js';
 import { Screens, makeDodgeButtons } from './ui/screens.js';
 import { noise1, clamp } from './core/noise.js';
+import { studyPose } from './actor/cut-demo.js';
+import { makePose } from './actor/poses.js';
 
 const params = new URLSearchParams(location.search);
+const fullBody = params.get('demo') === 'cut';
+const study = { time: 0, phase: 'idle', pose: makePose() };
 const $ = (id) => document.getElementById(id);
 const app = $('app');
 const bgCanvas = $('bg');
@@ -37,8 +41,8 @@ scene.add(keyLight);
 // cuts travel across the space between them.
 const GAP = 2.15;
 const vec = (s, d) => (s ? new THREE.Vector3(...s.split(',').map(Number)) : d);
-const CAM = vec(params.get('cam'), new THREE.Vector3(0.95, 1.85, 1.35));
-const LOOK = vec(params.get('look'), new THREE.Vector3(-0.5, 1.0, -1.8));
+const CAM = vec(params.get('cam'), fullBody ? new THREE.Vector3(2.6, 1.9, 3.5) : new THREE.Vector3(0.95, 1.85, 1.35));
+const LOOK = vec(params.get('look'), fullBody ? new THREE.Vector3(0, 0.85, -0.35) : new THREE.Vector3(-0.5, 1.0, -1.8));
 
 const player = new Swordsman({ position: new THREE.Vector3(0, 0, 0), yaw: Math.PI, style: 'bun', palette: PALETTES.pale, name: 'you' });
 player.addTo(scene);
@@ -200,7 +204,7 @@ function synthSwipe(angleDeg, cy = 0.5) {
   duel.onSwipe({ a: p0, b: p1, dx: p1.x - p0.x, dy: p1.y - p0.y, id });
 }
 
-window.__game = { duel, fx, enemy, player, camera, synthSwipe, startFight, screens, ground, cam };
+window.__game = { duel, fx, enemy, player, camera, synthSwipe, startFight, screens, ground, cam, study };
 
 // ---- loop -------------------------------------------------------------------------
 let last = performance.now();
@@ -218,7 +222,19 @@ function frame(now) {
     dt = 0;
   }
 
-  if (posePick || pposePick) {
+  if (fullBody) {
+    // Fixed-step simulation makes both the loop and ?at= phase captures repeatable.
+    const fixedAt = Number(params.get('at'));
+    const targetTime = params.has('at') && Number.isFinite(fixedAt) ? Math.max(0, Math.min(4.2, fixedAt)) : study.time + realDt;
+    while (study.time <= targetTime) {
+      study.phase = studyPose(study.time, study.pose);
+      if (study.time === 0) { player.snap(study.pose); player.resetFeet(study.pose); }
+      player.boost = 2.4;
+      player.drive(study.pose, 1 / 120, camera.position);
+      enemy.drive(POSES.guardM, 1 / 120, camera.position);
+      study.time += 1 / 120;
+    }
+  } else if (posePick || pposePick) {
     const ep = pickPose(posePick) || POSES.guardL;
     const pp = pickPose(pposePick, true) || POSES.guardM;
     if (frames === 0) {
@@ -265,6 +281,7 @@ function frame(now) {
   camera.lookAt(cam.look.x + cam.dodgeSide * d * 0.15, cam.look.y, cam.look.z);
   camera.rotateZ(-cam.dodgeSide * d * 0.04 + dr * 0.05 + (noise1(cam.t * 23 + 3) - 0.5) * s * 0.035);
 
+  if (fullBody) placeCamera();
   renderer.render(scene, camera);
   fx.hud = duel.hud();
   fx.render(realDt);
@@ -276,7 +293,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 if (params.has('skip') || auto) startFight();
-else if (!posePick && !pposePick) screens.title(() => startFight());
+else if (!fullBody && !posePick && !pposePick) screens.title(() => startFight());
 if (params.get('demo') === 'draw') {
   // dev: start already sheathed, opponent about to cut
   const D = duel;
