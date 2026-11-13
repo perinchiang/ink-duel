@@ -8,7 +8,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   const base = 'http://127.0.0.1:5190/';
   for (const pose of ['rest', 'parryL', 'parryR', 'parryO', 'sheathed', 'drawCut', 'dodge1', 'dodge-1']) {
-    await page.goto(`${base}?ppose=${pose}`);
+    await page.goto(`${base}?character=rigged&ppose=${pose}`);
     await page.waitForFunction(() => window.__ready);
     const result = await page.evaluate(() => {
       const d = __game.player, v = d.visual;
@@ -22,15 +22,18 @@ try {
     assert.ok(result.finite && result.hidden && result.sword && result.enemy);
     console.log(pose, result);
   }
+  await page.goto(`${base}?ppose=rest`);
+  await page.waitForFunction(() => window.__ready);
+  assert.equal(await page.evaluate(() => __game.player.visualStatus), 'code');
   await page.goto(`${base}?character=code&ppose=rest`);
   await page.waitForFunction(() => window.__ready);
   assert.equal(await page.evaluate(() => __game.player.visualStatus), 'code');
   await page.route('**/models/swordsman-a.glb', route => route.abort());
-  await page.goto(`${base}?ppose=rest`);
+  await page.goto(`${base}?character=rigged&ppose=rest`);
   await page.waitForFunction(() => window.__ready);
   assert.ok(await page.evaluate(() => __game.player.visualStatus === 'fallback' && __game.player.torso.visible && __game.player.sword.visible));
   await page.unroute('**/models/swordsman-a.glb');
-  await page.goto(`${base}?auto=draw`);
+  await page.goto(`${base}?character=rigged&auto=draw`);
   await page.waitForFunction(() => window.__ready);
   await page.waitForTimeout(8000);
   assert.ok(await page.evaluate(() => __game.duel.time > 1 && __game.player.visualStatus === 'rigged'));

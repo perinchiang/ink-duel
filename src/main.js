@@ -42,7 +42,8 @@ const LOOK = vec(params.get('look'), new THREE.Vector3(-0.5, 1.0, -1.8));
 
 const player = new Swordsman({ position: new THREE.Vector3(0, 0, 0), yaw: Math.PI, style: 'bun', palette: PALETTES.pale, name: 'you' });
 player.addTo(scene);
-let visualSettled = params.get('character') === 'code';
+// Keep the cohesive ink character by default; generated model is opt-in for comparison.
+let visualSettled = params.get('character') !== 'rigged';
 player.visualStatus = visualSettled ? 'code' : 'loading';
 if (!visualSettled) {
   RiggedVisual.load(player).then(visual => {

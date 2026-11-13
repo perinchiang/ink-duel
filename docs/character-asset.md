@@ -14,8 +14,10 @@ exported render counts. The triangulated GLB audit reports **19,428 triangles,
 
 ## Integration
 
-- Default: rigged **player only**. `?character=code` restores the original
-  procedural player for comparison. Enemy remains procedural in either mode.
+- Default: original procedural ink player. Patrick rejected the generated model
+  as the default because its shading clashes and the sword/arm poses remain weak.
+  `?character=rigged` opts into the experimental rigged **player only**;
+  `?character=code` remains supported. Enemy stays procedural in either mode.
 - Load/parse/rig-validation failure retains the procedural player and logs a
   warning. `player.visualStatus` exposes `loading`, `rigged`, `code`, or
   `fallback`; screenshot `window.__ready` waits for loading to settle and a
