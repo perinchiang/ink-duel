@@ -44,6 +44,7 @@ export class Screens {
           <li><b>划</b>动手指出刀</li>
           <li>看红色来刀，<b>迎着它划</b>过去即是格挡</li>
           <li>两侧按钮或 A / D 闪避</li>
+          <li><b>逆时针画圈</b>归鞘，刀落前一瞬<b>迎刀出鞘</b>，一击重创</li>
         </ul>
         <div class="tap">点 击 开 始</div>
       </div>`,
@@ -55,7 +56,7 @@ export class Screens {
     this.show(
       `<div class="result ${s.win ? 'win' : 'lose'}">
         <div class="big">${s.win ? '胜' : '败'}</div>
-        <div class="stats">完美格挡 ${s.perfect}　·　最高连斩 ${s.maxCombo}　·　用时 ${s.time} 秒</div>
+        <div class="stats">完美格挡 ${s.perfect}　·　出鞘斩 ${s.draws ?? 0}　·　最高连斩 ${s.maxCombo}　·　用时 ${s.time} 秒</div>
         <div class="tap">点 击 再 战</div>
       </div>`,
       onRetry,

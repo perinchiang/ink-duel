@@ -17,6 +17,8 @@ export class InkFX {
     this.flash = 0;
     this.redVign = 0;
     this.flood = 0;
+    this.gather = 0;
+    this.gatherShown = 0;
     this.time = 0;
   }
 
@@ -86,11 +88,11 @@ export class InkFX {
   }
 
   /** A cut on the opponent: a paper-white slash line, with ink thrown along the stroke. */
-  cut(a, b, at) {
+  cut(a, b, at, big = false) {
     const dx = b.x - a.x, dy = b.y - a.y;
     const l = Math.hypot(dx, dy) || 1;
     const ux = dx / l, uy = dy / l;
-    const L = this.m * 0.16;
+    const L = this.m * (big ? 0.24 : 0.16);
     const pts = [];
     for (let i = 0; i <= 8; i++) {
       const t = i / 8 - 0.5;
@@ -100,10 +102,29 @@ export class InkFX {
     this.splat(at.x + ux * this.m * 0.05, at.y + uy * this.m * 0.05, this.m * 0.022, { dir: Math.atan2(uy, ux), spread: 0.55, drops: 16, streaks: 4, life: 0.9, hold: 0.25 });
   }
 
-  playerHurt(path) {
+  /** 出鞘: one long wet stroke across the whole frame, through the opponent. */
+  slash(c, ux, uy) {
+    const L = Math.hypot(this.w, this.h) * 0.62;
+    const pts = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16 - 0.5;
+      const bow = Math.sin((t + 0.5) * Math.PI) * this.m * 0.025;
+      pts.push({ x: c.x + ux * L * t * 2 - uy * bow, y: c.y + uy * L * t * 2 + ux * bow });
+    }
+    this.push({ kind: 'brush', pts, o: { width: this.m * 0.04, dry: 0.55, seed: Math.random() * 50, taperStart: 0.12, taperEnd: 0.6, head: 1.4 }, life: 1.6, hold: 0.7, draw: 0.09 });
+    this.push({ kind: 'brush', pts, o: { width: this.m * 0.012, color: PAPER, dry: 0.2, seed: Math.random() * 50, taperStart: 0.2, taperEnd: 0.4 }, life: 0.8, hold: 0.3, draw: 0.09 });
+    for (let i = 0; i < 6; i++) {
+      const t = (Math.random() - 0.5) * 0.9;
+      this.splat(c.x + ux * L * t, c.y + uy * L * t, this.m * (0.015 + Math.random() * 0.03), { dir: Math.atan2(uy, ux) + Math.PI / 2 * (Math.random() < 0.5 ? 1 : -1), spread: 0.5, life: 1.5, hold: 0.7 });
+    }
+    this.flash = 0.7;
+  }
+
+  playerHurt(path, at) {
     if (path && path.length > 1) {
       this.push({ kind: 'brush', pts: path, o: { width: this.m * 0.05, dry: 0.5, seed: Math.random() * 50, taperStart: 0.08, taperEnd: 0.6 }, life: 0.95, hold: 0.25 });
     }
+    if (at) this.splat(at.x, at.y, this.m * 0.03, { color: RED, life: 1.2, hold: 0.4, alpha: 0.9 });
     const w = this.w, h = this.h;
     const spots = [[0.04, 0.2], [0.96, 0.3], [0.08, 0.85], [0.92, 0.82], [0.5, 0.02]];
     for (const [sx, sy] of spots) {
@@ -133,6 +154,10 @@ export class InkFX {
       g.fillRect(0, 0, this.w, this.h);
       this.redVign = Math.max(0, this.redVign - dt * 1.6);
     }
+
+    // 归鞘: ink slowly gathers in from the edges while the blade waits in its sheath
+    this.gatherShown += ((this.gather || 0) - this.gatherShown) * Math.min(1, dt * 3);
+    if (this.gatherShown > 0.01) this.drawGather(g, this.gatherShown);
 
     const T = this.telegraph;
     if (T && T.alpha > 0.01 && T.pts.length > 1) {
@@ -207,7 +232,12 @@ export class InkFX {
       g.stroke();
       g.restore();
     } else if (it.kind === 'brush') {
-      drawBrush(g, it.pts, { ...it.o, alpha: fade });
+      let pts = it.pts;
+      if (it.draw) {
+        const n = Math.max(2, Math.ceil(pts.length * clamp(it.age / it.draw)));
+        pts = pts.slice(0, n);
+      }
+      drawBrush(g, pts, { ...it.o, alpha: fade });
     } else if (it.kind === 'text') {
       const s = 0.7 + 0.3 * popT;
       g.save();
@@ -226,11 +256,41 @@ export class InkFX {
     }
   }
 
+  drawGather(g, k) {
+    const w = this.w, h = this.h;
+    const pulse = 0.9 + 0.1 * Math.sin(this.time * 3);
+    const grd = g.createRadialGradient(w / 2, h * 0.48, this.m * (0.62 - 0.12 * k), w / 2, h * 0.5, Math.hypot(w, h) * 0.62);
+    grd.addColorStop(0, 'rgba(22,21,26,0)');
+    grd.addColorStop(1, `rgba(22,21,26,${0.42 * k * pulse})`);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    // wisps drifting inward
+    if (!this.wisps) this.wisps = Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * Math.PI * 2 + Math.random(), t: Math.random(), s: 0.5 + Math.random() }));
+    g.save();
+    g.strokeStyle = INK;
+    g.lineCap = 'round';
+    for (const p of this.wisps) {
+      p.t = (p.t + 0.004 * p.s) % 1;
+      const R0 = Math.hypot(w, h) * 0.55, R1 = this.m * 0.4;
+      const r = R0 + (R1 - R0) * p.t;
+      const r2 = r + this.m * 0.06;
+      const a = p.a + p.t * 0.4;
+      g.globalAlpha = k * 0.35 * Math.sin(Math.PI * p.t);
+      g.lineWidth = this.m * 0.006 * (1 - p.t * 0.6);
+      g.beginPath();
+      g.moveTo(w / 2 + Math.cos(a) * r2, h * 0.5 + Math.sin(a) * r2);
+      g.lineTo(w / 2 + Math.cos(a) * r, h * 0.5 + Math.sin(a) * r);
+      g.stroke();
+    }
+    g.restore();
+  }
+
   drawHint(g, H) {
+    if (H.kind === 'circle') return this.drawCircleHint(g, H);
     // a faint ink arrow showing the parry swipe: "meet the blade"
     const ang = (H.angle * Math.PI) / 180;
     const ux = Math.cos(ang), uy = -Math.sin(ang);
-    const cx = this.w * 0.5 + (H.ox ?? 0), cy = this.h * 0.62;
+    const cx = H.at ? H.at.x : this.w * 0.5, cy = H.at ? H.at.y + this.m * 0.2 : this.h * 0.62;
     const L = this.m * 0.24;
     const a = { x: cx - ux * L * 0.5, y: cy - uy * L * 0.5 };
     const b = { x: cx + ux * L * 0.5, y: cy + uy * L * 0.5 };
@@ -253,6 +313,36 @@ export class InkFX {
     g.font = `${Math.round(this.m * 0.036)}px ${KAI}`;
     g.textAlign = 'center';
     g.fillText(H.label ?? '迎 刀 而 上', cx, cy + this.m * 0.17);
+    g.restore();
+  }
+
+  drawCircleHint(g, H) {
+    const cx = this.w * 0.5, cy = this.h * 0.6, r = this.m * 0.1;
+    g.save();
+    g.globalAlpha = H.alpha * 0.55;
+    const a0 = -0.2, a1 = a0 - Math.PI * 1.7; // counter-clockwise on screen
+    const pts = [];
+    for (let i = 0; i <= 30; i++) {
+      const a = a0 + (a1 - a0) * (i / 30);
+      pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+    }
+    drawBrush(g, pts, { width: this.m * 0.02, dry: 0.7, seed: 12, taperStart: 0.05, taperEnd: 0.3, head: 0.2, alpha: 1 });
+    // arrow head at the end, pointing along the motion
+    const e = pts[pts.length - 1], p = pts[pts.length - 3];
+    const ux = e.x - p.x, uy = e.y - p.y, l = Math.hypot(ux, uy) || 1;
+    const dx = ux / l, dy = uy / l, hl = this.m * 0.04;
+    g.fillStyle = INK;
+    g.beginPath();
+    g.moveTo(e.x + dx * hl * 0.6, e.y + dy * hl * 0.6);
+    g.lineTo(e.x - dx * hl * 0.5 - dy * hl * 0.55, e.y - dy * hl * 0.5 + dx * hl * 0.55);
+    g.lineTo(e.x - dx * hl * 0.2, e.y - dy * hl * 0.2);
+    g.lineTo(e.x - dx * hl * 0.5 + dy * hl * 0.55, e.y - dy * hl * 0.5 - dx * hl * 0.55);
+    g.closePath();
+    g.fill();
+    g.globalAlpha = H.alpha * 0.8;
+    g.font = `${Math.round(this.m * 0.036)}px ${KAI}`;
+    g.textAlign = 'center';
+    g.fillText(H.label, cx, cy + r + this.m * 0.07);
     g.restore();
   }
 

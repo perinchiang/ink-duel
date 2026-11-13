@@ -1,5 +1,7 @@
 // Touch / mouse swipes. A swipe commits as soon as it is long enough (not on release),
-// so parries respond the moment the finger has clearly moved. The stroke keeps drawing.
+// so parries respond the moment the finger has clearly moved. The same stroke keeps
+// being tracked afterwards: if it closes into a counter-clockwise loop, that is the
+// sheathing gesture (归鞘).
 
 export class SwipeInput {
   constructor(el, h) {
@@ -28,7 +30,7 @@ export class SwipeInput {
     if (this.active) return;
     e.preventDefault();
     const now = performance.now();
-    this.active = { pid: e.pointerId, id: ++this.seq, pts: [{ x: e.clientX, y: e.clientY, t: now }], committed: false, commitAt: 0 };
+    this.active = { pid: e.pointerId, id: ++this.seq, pts: [{ x: e.clientX, y: e.clientY, t: now }], committed: false, circled: false, start: now };
     this.h.onStroke(this.active.id, this.active.pts, false);
   }
 
@@ -40,7 +42,13 @@ export class SwipeInput {
     for (const ev of evs.length ? evs : [e]) a.pts.push({ x: ev.clientX, y: ev.clientY, t: now });
     this.h.onStroke(a.id, a.pts, false);
     if (!a.committed) this.tryCommit(a, false);
-    else if (now - a.commitAt > 240) this.finish(a);
+    if (!a.circled && isCounterClockwiseLoop(a.pts, this.threshold())) {
+      a.circled = true;
+      this.h.onCircle?.();
+      this.finish(a);
+      return;
+    }
+    if (now - a.start > 1600) this.finish(a);
   }
 
   up(e) {
@@ -51,7 +59,7 @@ export class SwipeInput {
   }
 
   finish(a) {
-    this.h.onStroke(a.id, a.pts, true);
+    this.h.onStroke(a.id, a.pts, true, a.circled);
     this.active = null;
   }
 
@@ -62,8 +70,39 @@ export class SwipeInput {
     const th = this.threshold();
     if (d >= th || (final && d >= th * 0.45)) {
       a.committed = true;
-      a.commitAt = performance.now();
       this.h.onSwipe({ a: { x: p0.x, y: p0.y }, b: { x: p.x, y: p.y }, dx: p.x - p0.x, dy: p.y - p0.y, id: a.id });
     }
   }
+}
+
+/**
+ * A stroke counts as a counter-clockwise loop (as seen on screen) when it winds at least
+ * ~300° around its own centre, stays roughly round, and is big enough to be deliberate.
+ */
+export function isCounterClockwiseLoop(pts, minSize) {
+  if (pts.length < 12) return false;
+  let cx = 0, cy = 0;
+  for (const p of pts) {
+    cx += p.x;
+    cy += p.y;
+  }
+  cx /= pts.length;
+  cy /= pts.length;
+  let wind = 0, rSum = 0, rMin = Infinity, rMax = 0;
+  let prev = Math.atan2(-(pts[0].y - cy), pts[0].x - cx);
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i];
+    const r = Math.hypot(p.x - cx, p.y - cy);
+    rSum += r;
+    rMin = Math.min(rMin, r);
+    rMax = Math.max(rMax, r);
+    const a = Math.atan2(-(p.y - cy), p.x - cx); // y flipped: positive = counter-clockwise
+    let d = a - prev;
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    wind += d;
+    prev = a;
+  }
+  const rAvg = rSum / (pts.length - 1);
+  return wind > (Math.PI * 2 * 300) / 360 && rAvg > minSize * 0.45 && rMin > rAvg * 0.2 && rMax < rAvg * 2.6;
 }

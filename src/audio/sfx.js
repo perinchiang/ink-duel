@@ -245,6 +245,56 @@ export class Sfx {
     s.stop(t + 0.3);
   }
 
+  /** 归鞘: the blade sliding home and the guard clicking against the throat. */
+  sheathe() {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const s = this.noiseSrc();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 6;
+    bp.frequency.setValueAtTime(5200, t);
+    bp.frequency.exponentialRampToValueAtTime(2600, t + 0.22);
+    const g = this.gain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    s.connect(bp).connect(g);
+    this.out(g, 0.15);
+    s.start(t, Math.random());
+    s.stop(t + 0.26);
+    this.click(t + 0.24, 3000, 0.03, 0.5);
+    this.ring(1900, [1, 1.6], 0.18, 0.08, 0.3, t + 0.24);
+    this.pluck(196 * Math.pow(2, -5 / 12), t + 0.3, 0.2);
+  }
+
+  /** 出鞘: the ring of the blade leaving the scabbard; a success adds the deep cut. */
+  draw(success) {
+    if (!this.ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const s = this.noiseSrc();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 5;
+    bp.frequency.setValueAtTime(2400, t);
+    bp.frequency.exponentialRampToValueAtTime(7000, t + 0.1);
+    const g = this.gain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    s.connect(bp).connect(g);
+    this.out(g, 0.2);
+    s.start(t, Math.random());
+    s.stop(t + 0.16);
+    this.ring(2600, [1, 1.33, 2.1], success ? 1.4 : 0.5, success ? 0.12 : 0.07, 0.5, t + 0.02);
+    this.swish(success ? 1.3 : 1);
+    if (success) {
+      this.thump(t + 0.05, 180, 40, 0.5, 0.8);
+      this.hit(1);
+      [0, 7, 12].forEach((n, i) => this.pluck(196 * Math.pow(2, n / 12), t + 0.25 + i * 0.12, 0.3));
+    }
+  }
+
   death() {
     if (!this.ok()) return;
     const t = this.ctx.currentTime;

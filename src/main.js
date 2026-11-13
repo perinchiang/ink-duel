@@ -1,13 +1,12 @@
 import * as THREE from 'three';
 import { paintBackdrop, paperTextureURL } from './render/backdrop.js';
 import { InkFX } from './render/fx.js';
-import { Swordsman } from './actor/swordsman.js';
-import { POSES, ATTACKS, GUARD_POSE } from './actor/poses.js';
+import { Swordsman, PALETTES } from './actor/swordsman.js';
+import { POSES, ATTACKS, GUARD_POSE, PLAYER, cutPoses, dodgePose } from './actor/poses.js';
 import { Ground } from './world/ground.js';
 import { BambooGrove } from './world/bamboo.js';
-import { PlayerBlade } from './game/blade.js';
 import { SwipeInput } from './game/input.js';
-import { Duel, PARRY_ANGLE } from './game/duel.js';
+import { Duel, ANGLE } from './game/duel.js';
 import { Sfx } from './audio/sfx.js';
 import { Screens, makeDodgeButtons } from './ui/screens.js';
 import { noise1, clamp } from './core/noise.js';
@@ -24,18 +23,26 @@ renderer.setClearColor(0x000000, 0);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 200);
 scene.add(camera);
-const CAM = new THREE.Vector3(0, 1.55, 0);
-const LOOK = new THREE.Vector3(0, 1.2, -2.8);
 
-const enemy = new Swordsman({ position: new THREE.Vector3(0, 0, -2.8) });
-scene.add(enemy.group);
-const ground = new Ground(new THREE.Vector3(0, 0, -2.9));
+// The two duellists face each other along Z. The camera sits behind the player's right
+// shoulder, so the player stands in the lower left and the opponent on the right; his
+// cuts travel across the space between them.
+const GAP = 2.15;
+const vec = (s, d) => (s ? new THREE.Vector3(...s.split(',').map(Number)) : d);
+const CAM = vec(params.get('cam'), new THREE.Vector3(0.95, 1.85, 1.35));
+const LOOK = vec(params.get('look'), new THREE.Vector3(-0.5, 1.0, -1.8));
+
+const player = new Swordsman({ position: new THREE.Vector3(0, 0, 0), yaw: Math.PI, style: 'bun', palette: PALETTES.pale, name: 'you' });
+player.addTo(scene);
+const enemy = new Swordsman({ position: new THREE.Vector3(0, 0, -GAP), yaw: 0, style: 'hat', palette: PALETTES.dark, name: '墨卫' });
+enemy.addTo(scene);
+const ground = new Ground(new THREE.Vector3(0, 0, -GAP / 2), 8);
 scene.add(ground.mesh);
 const bamboo = new BambooGrove();
+bamboo.group.position.z = 0.9;
 scene.add(bamboo.group);
-const blade = new PlayerBlade(camera);
 const fx = new InkFX(fxCanvas);
 const sfx = new Sfx();
 const screens = new Screens($('ui'));
@@ -52,18 +59,19 @@ const view = {
   },
 };
 
-const cam = { shake: 0, dodgeT: 1, dodgeSide: 0, t: 0 };
+const cam = { shake: 0, dodgeT: 1, dodgeSide: 0, t: 0, push: 0, drawT: 1, base: CAM.clone(), look: LOOK.clone() };
 let hitstop = 0, timeScale = 1, slowT = 0;
 
 const dodgeUI = makeDodgeButtons($('ui'), (s) => duel.onDodge(s));
 
 const duel = new Duel({
-  enemy, fx, blade, sfx, ground, view,
+  enemy, player, fx, sfx, ground, view,
   hooks: {
     hitstop: (t) => (hitstop = Math.max(hitstop, t)),
     shake: (a) => (cam.shake = Math.max(cam.shake, a)),
     slowmo: (s, d) => { timeScale = s; slowT = d; },
     dodge: (side) => { cam.dodgeT = 0; cam.dodgeSide = side; },
+    draw: () => { cam.drawT = 0; },
     end: (win, s) => {
       dodgeUI.show(false);
       screens.result({ ...s, win }, () => startFight());
@@ -73,8 +81,9 @@ const duel = new Duel({
 
 new SwipeInput(app, {
   onSwipe: (sw) => duel.onSwipe(sw),
-  onStroke: (id, pts, done) => fx.stroke(id, pts, done),
+  onStroke: (id, pts, done, circled) => fx.stroke(id, pts, done, circled),
   onDodge: (s) => duel.onDodge(s),
+  onCircle: () => duel.onCircle(),
 });
 
 function startFight() {
@@ -83,8 +92,17 @@ function startFight() {
   fx.flood = 0;
   duel.reset();
   enemy.setDissolve(0);
+  player.snap(POSES.rest);
+  player.resetFeet(POSES.rest);
+  enemy.snap(POSES.rest);
+  enemy.resetFeet(POSES.rest);
   duel.begin();
   dodgeUI.show(true);
+}
+
+function placeCamera() {
+  camera.position.copy(cam.base);
+  camera.lookAt(cam.look);
 }
 
 function resize() {
@@ -95,13 +113,16 @@ function resize() {
   renderer.setSize(W, H, false);
   const aspect = W / H;
   camera.aspect = aspect;
-  // keep the duellist framed on tall phones too
-  camera.fov = aspect >= 1.25 ? 50 : clamp(50 * Math.pow(1.25 / aspect, 0.85), 50, 88);
-  camera.position.copy(CAM);
-  camera.lookAt(LOOK);
+  // keep both duellists framed on narrower screens: widen and pull back a little
+  const narrow = clamp((1.6 - aspect) / 1.0, 0, 1);
+  camera.fov = 46 + narrow * 30;
+  const tall = clamp((1 - aspect) / 0.55, 0, 1);
+  cam.base.copy(CAM).add(_p.set(-0.25 * narrow - 0.25 * tall, 0.15 * narrow + 0.55 * tall, 0.5 * narrow + 1.3 * tall));
+  cam.look.copy(LOOK).add(_p.set(0.3 * narrow + 0.2 * tall, -0.05 * narrow - 0.1 * tall, 0));
+  placeCamera();
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
-  const horizon = view.project(_p.set(0, CAM.y, -2000));
+  const horizon = view.project(_p.set(cam.look.x, camera.position.y, -2000));
   paintBackdrop(bgCanvas, W, H, dpr, horizon.y);
   fx.resize(W, H, dpr);
   duel.tel.pts = [];
@@ -109,20 +130,40 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// ---- dev hooks: ?pose=windupL  ?skip  ?auto  ----------------------------------
+// ---- dev hooks: ?pose=windupL&ppose=parryL  ?skip  ?auto[=parry|none|dodge|draw] ----
 const posePick = params.get('pose');
+const pposePick = params.get('ppose');
 const auto = params.has('auto');
 const autoMode = params.get('auto') || 'parry';
 let autoNext = 0;
+function pickPose(name, isPlayer) {
+  if (!name) return null;
+  if (name.startsWith('guard')) return GUARD_POSE[name.slice(5)] || POSES[name];
+  if (name.startsWith('parry')) return PLAYER.parry[name.slice(5)];
+  if (PLAYER[name]) return PLAYER[name];
+  const m = name.match(/^cut([wif]):(.+)$/);
+  if (m) {
+    const [w, i, f] = cutPoses(...m[2].split(',').map(Number));
+    return { w, i, f }[m[1]];
+  }
+  if (name.startsWith('dodge')) return dodgePose(+name.slice(5) || 1);
+  return POSES[name] || ATTACKS[name.slice(-1)]?.[name.slice(0, -1)];
+}
+
 function autopilot() {
-  const E = duel.E;
+  const E = duel.E, P = duel.P;
   if (duel.over) return;
   if (E.state === 'windup' || E.state === 'strike') {
     const A = E.attack;
-    const toImpact = E.state === 'windup' ? A.W - E.t + A.S : A.S - E.t;
-    if (autoMode === 'parry' && !duel.P.parry && toImpact < 0.08 && !(A.feint && !A.feinted)) synthSwipe(PARRY_ANGLE[A.dir], 0.62);
-    if (autoMode === 'dodge' && toImpact < 0.25 && duel.time - duel.P.dodgeAt > 0.6) duel.onDodge(Math.random() < 0.5 ? -1 : 1);
-  } else if ((E.state === 'stagger' || E.state === 'recover') && duel.time > autoNext) {
+    const tti = duel.timeToImpact();
+    const feintPending = A.feint && !A.feinted;
+    if (autoMode === 'draw' && P.sheathed) {
+      if (!feintPending && tti < 0.14) synthSwipe(A.angle);
+    } else if ((autoMode === 'parry' || autoMode === 'draw') && !P.parry && tti < 0.08 && !feintPending) synthSwipe(A.angle);
+    if (autoMode === 'dodge' && tti < 0.25 && duel.time - P.dodgeAt > 0.6) duel.onDodge(Math.random() < 0.5 ? -1 : 1);
+  } else if (E.state === 'stagger' && autoMode === 'draw' && !P.sheathed && !P.sheathing && E.t > 0.1) {
+    duel.onCircle();
+  } else if ((E.state === 'stagger' || E.state === 'recover') && duel.time > autoNext && !P.sheathed && !P.sheathing) {
     autoNext = duel.time + 0.17;
     synthSwipe(Math.random() < 0.5 ? -30 : 210 + Math.random() * 20, 0.45);
   }
@@ -131,7 +172,7 @@ let synthId = 1e6;
 function synthSwipe(angleDeg, cy = 0.5) {
   const a = (angleDeg * Math.PI) / 180;
   const L = Math.min(W, H) * 0.3;
-  const c = { x: W / 2, y: H * cy };
+  const c = { x: W * 0.55, y: H * cy };
   const p0 = { x: c.x - Math.cos(a) * L * 0.5, y: c.y + Math.sin(a) * L * 0.5 };
   const p1 = { x: c.x + Math.cos(a) * L * 0.5, y: c.y - Math.sin(a) * L * 0.5 };
   const pts = [];
@@ -141,7 +182,7 @@ function synthSwipe(angleDeg, cy = 0.5) {
   duel.onSwipe({ a: p0, b: p1, dx: p1.x - p0.x, dy: p1.y - p0.y, id });
 }
 
-window.__game = { duel, fx, enemy, camera, blade, synthSwipe, startFight, screens, ground };
+window.__game = { duel, fx, enemy, player, camera, synthSwipe, startFight, screens, ground, cam };
 
 // ---- loop -------------------------------------------------------------------------
 let last = performance.now();
@@ -159,10 +200,19 @@ function frame(now) {
     dt = 0;
   }
 
-  if (posePick) {
-    const p = posePick.startsWith('guard') ? GUARD_POSE[posePick.slice(5)] : POSES[posePick] || ATTACKS[posePick.slice(-1)]?.[posePick.slice(0, -1)];
-    if (p) duel.pose = p;
-    enemy.setGlow(posePick.startsWith('windup') ? 0.7 : 0);
+  if (posePick || pposePick) {
+    const ep = pickPose(posePick) || POSES.guardL;
+    const pp = pickPose(pposePick, true) || POSES.guardM;
+    if (frames === 0) {
+      enemy.snap(ep);
+      player.snap(pp);
+      enemy.resetFeet(ep);
+      player.resetFeet(pp);
+    }
+    enemy.setGlow(posePick?.startsWith('windup') ? 0.7 : 0);
+    enemy.drive(ep, realDt, camera.position);
+    player.drive(pp, realDt, camera.position);
+    fx.gather = pp === PLAYER.sheathed ? 1 : 0;
   } else {
     if (auto) autopilot();
     duel.update(dt);
@@ -170,22 +220,32 @@ function frame(now) {
     enemy.setFlash(duel.E.flash * 0.9);
     enemy.setDissolve(duel.E.dissolve);
     if (fx.flood > 0 && fx.flood < 1) fx.flood = Math.min(1, fx.flood + realDt * 0.5);
+    fx.gather = duel.P.sheathed ? 1 : duel.P.sheathing ? 0.4 : 0;
+    enemy.boost = duel.enemyBoost;
+    const tag = duel.anim.tag;
+    player.boost = tag === 'cut' || tag === 'draw' || tag === 'parry' ? 2.4 : tag === 'dodge' ? 1.6 : 1;
+    enemy.drive(duel.pose, dt, camera.position);
+    player.drive(duel.playerPose, dt, camera.position);
   }
-  enemy.apply(duel.pose, dt, camera.position);
-  blade.update(realDt);
   bamboo.update(now / 1000);
 
-  // camera: shake, dodge sidestep, a faint handheld drift
+  // camera: shake, dodge sidestep, a push-in on the draw, a faint handheld drift
   cam.t += realDt;
   cam.shake = Math.max(0, cam.shake - realDt * 3.2);
   const s = cam.shake * cam.shake;
-  cam.dodgeT = Math.min(1, cam.dodgeT + realDt / 0.5);
-  const d = Math.sin(Math.PI * cam.dodgeT) * (cam.dodgeT < 1 ? 1 : 0);
-  const sx = (noise1(cam.t * 31) - 0.5) * s * 0.09 + Math.sin(cam.t * 0.6) * 0.006;
-  const sy = (noise1(cam.t * 29 + 7) - 0.5) * s * 0.07 + Math.sin(cam.t * 0.9) * 0.004;
-  camera.position.set(CAM.x + sx + cam.dodgeSide * d * 0.7, CAM.y + sy - d * 0.08, CAM.z);
-  camera.lookAt(LOOK.x + cam.dodgeSide * d * 0.3, LOOK.y, LOOK.z);
-  camera.rotateZ(-cam.dodgeSide * d * 0.07 + (noise1(cam.t * 23 + 3) - 0.5) * s * 0.04);
+  cam.dodgeT = Math.min(1, cam.dodgeT + realDt / 0.55);
+  const d = cam.dodgeT < 1 ? Math.sin(Math.PI * cam.dodgeT) : 0;
+  cam.drawT = Math.min(1, cam.drawT + realDt / 1.1);
+  const dr = cam.drawT < 1 ? Math.sin(Math.PI * Math.pow(cam.drawT, 0.6)) : 0;
+  const wantPush = duel.E.state === 'windup' ? 0.025 : duel.E.state === 'strike' ? 0.04 : 0;
+  cam.push += (wantPush - cam.push) * Math.min(1, realDt * 6);
+  const sx = (noise1(cam.t * 31) - 0.5) * s * 0.08 + Math.sin(cam.t * 0.6) * 0.006;
+  const sy = (noise1(cam.t * 29 + 7) - 0.5) * s * 0.06 + Math.sin(cam.t * 0.9) * 0.004;
+  camera.position.copy(cam.base).lerp(cam.look, cam.push + dr * 0.03);
+  camera.position.x += sx + cam.dodgeSide * d * 0.42;
+  camera.position.y += sy - d * 0.05;
+  camera.lookAt(cam.look.x + cam.dodgeSide * d * 0.15, cam.look.y, cam.look.z);
+  camera.rotateZ(-cam.dodgeSide * d * 0.04 + dr * 0.05 + (noise1(cam.t * 23 + 3) - 0.5) * s * 0.035);
 
   renderer.render(scene, camera);
   fx.hud = duel.hud();
@@ -198,4 +258,13 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 if (params.has('skip') || auto) startFight();
-else if (!posePick) screens.title(() => startFight());
+else if (!posePick && !pposePick) screens.title(() => startFight());
+if (params.get('demo') === 'draw') {
+  // dev: start already sheathed, opponent about to cut
+  const D = duel;
+  D.E.state = 'idle'; D.E.t = 0; D.E.dur = 0.4; D.E.guard = 'L';
+  D.P.sheathed = true;
+  D.anim.idle = PLAYER.sheathed;
+  D.anim.play([{ pose: PLAYER.sheathed, dur: 0.01 }], { then: 'hold', tag: 'sheathe' });
+  player.snap(PLAYER.sheathed);
+}

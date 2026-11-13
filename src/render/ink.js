@@ -26,10 +26,12 @@ float inoise(vec2 p){
 float dissolveField(vec3 w){ return inoise(w.xy * 7.0 + w.z * 3.0) * 0.6 + inoise(w.zy * 19.0 + 3.7) * 0.4; }
 `;
 
-export function inkMaterial({ light = '#b9b2a5', dark = '#232126', glow = COLORS.red, side = THREE.FrontSide } = {}) {
+export function inkMaterial({ light = '#b9b2a5', dark = '#232126', glow = COLORS.red, side = THREE.FrontSide, pattern = null } = {}) {
   return new THREE.ShaderMaterial({
     side,
+    defines: pattern ? { USE_PATTERN: '' } : {},
     uniforms: {
+      uPattern: { value: pattern },
       uLight: { value: hex3(light) },
       uDark: { value: hex3(dark) },
       uLightDir: { value: LIGHT_DIR },
@@ -40,17 +42,19 @@ export function inkMaterial({ light = '#b9b2a5', dark = '#232126', glow = COLORS
       uDissolve: { value: 0 },
     },
     vertexShader: /* glsl */ `
-      varying vec3 vN; varying vec3 vW;
+      varying vec3 vN; varying vec3 vW; varying vec2 vUv;
       void main(){
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vW = wp.xyz;
+        vUv = uv;
         vN = normalize(mat3(modelMatrix) * normal);
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
     fragmentShader: /* glsl */ `
       uniform vec3 uLight, uDark, uLightDir, uGlowColor, uFlashColor;
       uniform float uGlow, uFlash, uDissolve;
-      varying vec3 vN; varying vec3 vW;
+      uniform sampler2D uPattern;
+      varying vec3 vN; varying vec3 vW; varying vec2 vUv;
       ${NOISE}
       void main(){
         vec3 N = normalize(vN);
@@ -62,6 +66,11 @@ export function inkMaterial({ light = '#b9b2a5', dark = '#232126', glow = COLORS
         float t = l + (g - 0.5) * 0.32;
         float band = smoothstep(0.43, 0.48, t) * 0.5 + smoothstep(0.69, 0.74, t) * 0.5;
         vec3 col = mix(uDark, uLight, band);
+        #ifdef USE_PATTERN
+          // garment lines painted in the surface's own UV space, so they follow the body
+          vec4 pc = texture2D(uPattern, vUv);
+          col = mix(col, pc.rgb, pc.a);
+        #endif
         if (uDissolve > 0.0) {
           float d = dissolveField(vW);
           float th = uDissolve * 1.15 - 0.08;
