@@ -122,6 +122,10 @@ export class Swordsman {
     if (style !== 'hat') handGeo.scale(1, 1, 0.8);
     this.handR = add(inkPart(handGeo, M.skin, line));
     this.handL = add(inkPart(handGeo, M.skin, line));
+    if (style !== 'hat') {
+      // Thumb/index ridge on the guard (+Y) end of the grip, never the pommel.
+      this.gripThumb = add(inkPart(new THREE.CapsuleGeometry(0.013, 0.025, 4, 8), M.skin, line));
+    }
 
     const footGeo = new THREE.BoxGeometry(0.1, 0.06, 0.21);
     footGeo.translate(0, 0.03, 0.05);
@@ -300,14 +304,28 @@ export class Swordsman {
     this.handR.position.copy(P.hR);
 
     _x.addScaledVector(_y, -_x.dot(_y));
-    if (_x.lengthSq() < 1e-5) _x.set(1, 0, 0).addScaledVector(_y, -_y.x);
+    if (_x.lengthSq() < 1e-5) {
+      _x.set(Math.abs(_y.x) < 0.9 ? 1 : 0, Math.abs(_y.x) < 0.9 ? 0 : 1, 0);
+      _x.addScaledVector(_y, -_x.dot(_y));
+    }
     _x.normalize();
     _z.crossVectors(_x, _y).normalize();
     _m.makeBasis(_x, _y, _z);
     this.sword.quaternion.setFromRotationMatrix(_m);
     this.sword.position.copy(P.hR);
-    // Closed palm wraps along the hilt rather than a directionless ball at the cuff.
-    if (this.style !== 'hat') this.handR.quaternion.copy(this.sword.quaternion);
+    // The capsule's long +Y is wrist-to-knuckles, NOT grip-to-tip.
+    // Keep it continuous with the forearm; the hilt crosses the closed palm.
+    if (this.style !== 'hat') {
+      _b.subVectors(P.hR, P.elR).normalize();
+      _c.copy(_y).addScaledVector(_b, -_y.dot(_b));
+      if (_c.lengthSq() < 1e-5) _c.copy(_x).addScaledVector(_b, -_x.dot(_b));
+      _c.normalize();
+      _v.crossVectors(_c, _b).normalize();
+      this.handR.quaternion.setFromRotationMatrix(_m.makeBasis(_c, _b, _v));
+      this.gripThumb.visible = !this.visual;
+      this.gripThumb.position.copy(P.hR).addScaledVector(_y, 0.034).addScaledVector(_z, 0.023);
+      this.gripThumb.quaternion.copy(this.sword.quaternion);
+    }
     P.tip.copy(P.hR).addScaledVector(_y, TIP);
     const swordY = _y.clone();
 

@@ -29,7 +29,7 @@ export function makePose(o = {}) {
     hilt: [-0.14, 1.12, 0.36],
     dir: [0, 0.6, 0.8],
     edge: [0, 1, 0],
-    lhand: [0.22, 1.32, 0.1],
+    lhand: [0.29, 0.76, -0.08],
     two: 0,
     head: [0, 0],
     sheath: 0,
@@ -67,10 +67,10 @@ export function blendPose(a, b, t, out) {
 }
 
 export const POSES = {
-  // 按剑: arm hanging straight, point resting toward the ground ahead; sword-finger at the chest
-  rest: makePose({ hilt: [-0.25, 0.83, 0.1], dir: [-0.06, -0.7, 0.71], edge: [0, 0.7, 0.7], lhand: [0.04, 1.22, 0.24], lean: 0.03, crouch: 0.02, head: [0.06, 0] }),
-  // 中段: point at the opponent's throat, knees soft, sword-finger raised behind
-  guardM: makePose({ hilt: [-0.2, 1.02, 0.34], dir: [-0.26, 0.12, 0.96], edge: [0, 1, 0], lhand: [0.2, 1.2, 0.2], crouch: 0.11, twist: 0.14, lean: 0.06 }),
+  // 按剑: point resting toward the ground ahead; free hand low beside the hip
+  rest: makePose({ hilt: [-0.25, 0.83, 0.1], dir: [-0.06, -0.7, 0.71], edge: [0, 0.7, 0.7], lhand: [0.29, 0.78, -0.08], lean: 0.03, crouch: 0.02, head: [0.06, 0] }),
+  // 中段: point forward, knees soft, free hand relaxed behind the hip
+  guardM: makePose({ hilt: [-0.2, 1.02, 0.34], dir: [-0.26, 0.12, 0.96], edge: [0, 1, 0], lhand: [0.29, 0.76, -0.08], crouch: 0.11, twist: 0.14, lean: 0.06 }),
   // guards: the side the blade covers is the side your cut will be stopped on
   guardL: makePose({ hilt: [-0.25, 1.16, 0.34], dir: [-0.12, 0.86, 0.5], edge: [-1, 0, 0.2], lhand: [0.24, 1.34, 0.12], twist: -0.12, crouch: 0.09, lean: 0.05 }),
   guardR: makePose({ hilt: [0.05, 1.16, 0.36], dir: [0.24, 0.84, 0.48], edge: [1, 0, 0.2], lhand: [0.3, 1.0, -0.06], twist: 0.3, crouch: 0.09, lean: 0.05 }),
@@ -127,13 +127,19 @@ export const PLAYER = {
  * Returns [windup, impact, follow].
  */
 export function cutPoses(ux, uy) {
-  const lx = -ux, ly = uy;
-  const C = [-0.12, 1.34, 0.3];
+  const length = Math.hypot(ux, uy) || 1;
+  const lx = -ux / length, ly = uy / length;
+  const C = [-0.17, 1.18, 0.28];
+  // Sweep in the lateral/vertical plane with slight forward clearance.
+  // Edge is the rotational tangent, never a parallel-to-blade hint.
+  const blade = (angle) => ({
+    dir: [lx * Math.sin(angle) - ly * Math.cos(angle), ly * Math.sin(angle) + lx * Math.cos(angle), 0.3],
+    edge: [lx * Math.cos(angle) + ly * Math.sin(angle), ly * Math.cos(angle) - lx * Math.sin(angle), 0],
+  });
   const windup = makePose({
-    hilt: [C[0] - lx * 0.3, C[1] - ly * 0.32 + 0.1, 0.06],
-    dir: [-lx * 0.75, -ly * 0.75 + 0.3, -0.12],
-    edge: [lx, ly, 0.2],
-    lhand: [0.26, 1.28, 0.12],
+    hilt: [C[0] - lx * 0.16, C[1] - ly * 0.28 + 0.1, 0.22],
+    ...blade(-1.3),
+    lhand: [0.29, 0.76, -0.08],
     twist: -lx * 0.52 + 0.05,
     pelvis: -lx * 0.22,
     weight: [0.035, -0.08],
@@ -142,10 +148,9 @@ export function cutPoses(ux, uy) {
     root: [0, -0.02],
   });
   const impact = makePose({
-    hilt: [C[0] + lx * 0.06, C[1] + ly * 0.04 - 0.02, 0.58],
-    dir: [lx * 0.42, ly * 0.42 + 0.05, 0.92],
-    edge: [lx, ly, 0],
-    lhand: [0.32, 1.12, -0.08],
+    hilt: [C[0] - 0.18 + lx * 0.08, C[1] + 0.26 + ly * 0.1, 0.3],
+    ...blade(0.15),
+    lhand: [0.29, 0.75, -0.1],
     twist: lx * 0.12 + 0.12,
     pelvis: lx * 0.3 + 0.08,
     weight: [-0.045, 0.07],
@@ -154,10 +159,9 @@ export function cutPoses(ux, uy) {
     root: [0, 0.12],
   });
   const follow = makePose({
-    hilt: [C[0] + lx * 0.28, C[1] + ly * 0.36 - 0.12, 0.42],
-    dir: [lx * 0.85, ly * 0.85 - 0.1, 0.5],
-    edge: [lx, ly, -0.4],
-    lhand: [0.3, 1.18, -0.13],
+    hilt: [C[0] + lx * 0.56, C[1] + ly * 0.22, 0.18],
+    ...blade(1.65),
+    lhand: [0.29, 0.73, -0.12],
     twist: lx * 0.48 + 0.12,
     pelvis: lx * 0.24 + 0.08,
     weight: [-0.045, 0.06],
