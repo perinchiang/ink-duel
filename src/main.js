@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { paintBackdrop, paperTextureURL } from './render/backdrop.js';
 import { InkFX } from './render/fx.js';
 import { Swordsman, PALETTES } from './actor/swordsman.js';
+import { RiggedVisual } from './actor/rigged-visual.js';
 import { POSES, ATTACKS, GUARD_POSE, PLAYER, cutPoses, dodgePose } from './actor/poses.js';
 import { Ground } from './world/ground.js';
 import { BambooGrove } from './world/bamboo.js';
@@ -25,6 +26,11 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 200);
 scene.add(camera);
+// Standard GLTF materials retain Three's skinning path; ink shaders remain on primitives.
+scene.add(new THREE.HemisphereLight(0xfff5e3, 0x656775, 2.2));
+const keyLight = new THREE.DirectionalLight(0xfff3dc, 2.5);
+keyLight.position.set(-3, 6, 4);
+scene.add(keyLight);
 
 // The two duellists face each other along Z. The camera sits behind the player's right
 // shoulder, so the player stands in the lower left and the opponent on the right; his
@@ -36,6 +42,17 @@ const LOOK = vec(params.get('look'), new THREE.Vector3(-0.5, 1.0, -1.8));
 
 const player = new Swordsman({ position: new THREE.Vector3(0, 0, 0), yaw: Math.PI, style: 'bun', palette: PALETTES.pale, name: 'you' });
 player.addTo(scene);
+let visualSettled = params.get('character') === 'code';
+player.visualStatus = visualSettled ? 'code' : 'loading';
+if (!visualSettled) {
+  RiggedVisual.load(player).then(visual => {
+    player.visual = visual;
+    player.visualStatus = 'rigged';
+  }).catch(error => {
+    player.visualStatus = 'fallback';
+    console.warn('Rigged player unavailable; keeping procedural character.', error);
+  }).finally(() => { visualSettled = true; });
+}
 const enemy = new Swordsman({ position: new THREE.Vector3(0, 0, -GAP), yaw: 0, style: 'hat', palette: PALETTES.dark, name: '墨卫' });
 enemy.addTo(scene);
 const ground = new Ground(new THREE.Vector3(0, 0, -GAP / 2), 8);
@@ -252,7 +269,7 @@ function frame(now) {
   fx.render(realDt);
 
   frames++;
-  if (frames === 3) window.__ready = true;
+  if (frames >= 3 && visualSettled) window.__ready = true;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

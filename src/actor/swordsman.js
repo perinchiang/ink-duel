@@ -305,6 +305,7 @@ export class Swordsman {
     this.handL.position.copy(P.hL);
 
     this.stepFeet(dt, P, p);
+    this.visual?.update(p);
     this.shadow.position.set(P.hips.x, 0.004, P.hips.z + 0.04);
     const ss = 1 + p.crouch * 0.6;
     this.shadow.scale.set(ss, ss, 1);
