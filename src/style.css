@@ -1,0 +1,56 @@
+:root {
+  --paper: #ebe3d2;
+  --ink: #16151a;
+  --red: #b3352b;
+  --kai: "Kaiti SC", "STKaiti", "KaiTi", "BiauKai", "Songti SC", "STSong", serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: var(--paper);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+#app { position: fixed; inset: 0; touch-action: none; cursor: crosshair; }
+#app canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#paper { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; opacity: 0.55; background-size: 256px 256px; }
+#ui { position: absolute; inset: 0; pointer-events: none; font-family: var(--kai); color: var(--ink); }
+#ui > * { pointer-events: auto; }
+
+.screen {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(235,227,210,0.55), rgba(235,227,210,0.88));
+  opacity: 0; transition: opacity 0.5s ease; cursor: pointer;
+}
+.screen.in { opacity: 1; }
+.screen.out { opacity: 0; pointer-events: none; }
+.title, .result { text-align: center; transform: translateY(8px); transition: transform 0.8s ease; }
+.screen.in .title, .screen.in .result { transform: none; }
+.logo { position: relative; display: inline-flex; gap: 0.08em; font-size: min(24vh, 19vw); line-height: 1; letter-spacing: 0.02em; }
+.logo span:nth-child(2) { transform: translateY(0.12em); }
+.seal {
+  position: absolute; right: -0.42em; bottom: 0.05em; font-style: normal; font-size: 0.13em;
+  writing-mode: vertical-rl; color: var(--paper); background: var(--red); padding: 0.35em 0.22em;
+  border-radius: 0.12em; letter-spacing: 0.1em; box-shadow: inset 0 0 0 0.12em rgba(235,227,210,0.35);
+}
+.sub { font-size: min(3.6vh, 4.5vw); letter-spacing: 0.4em; margin-top: 0.8em; opacity: 0.7; }
+.how { list-style: none; padding: 0; margin: 1.6em 0 0; font-size: min(2.8vh, 3.6vw); line-height: 2; opacity: 0.8; }
+.how b { font-weight: normal; color: var(--red); }
+.tap { margin-top: 1.6em; font-size: min(3vh, 4vw); letter-spacing: 0.5em; animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+.result .big { font-size: min(34vh, 28vw); line-height: 1; }
+.result.lose .big { color: var(--red); }
+.result .stats { font-size: min(3vh, 4vw); opacity: 0.75; margin-top: 0.4em; }
+
+.dodges { position: absolute; inset: 0; pointer-events: none !important; opacity: 0; transition: opacity 0.4s; }
+.dodges.on { opacity: 1; }
+.dodges.on .dodge { pointer-events: auto; }
+.dodge {
+  position: absolute; bottom: max(4vh, env(safe-area-inset-bottom)); width: min(15vh, 18vw); height: min(15vh, 18vw);
+  border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px solid rgba(22,21,26,0.35); color: rgba(22,21,26,0.55); font-size: min(3.4vh, 4.4vw);
+  background: rgba(235,227,210,0.25); pointer-events: none; transition: transform 0.12s, background 0.12s;
+}
+.dodge span { font-size: 1.8em; line-height: 0.8; }
+.dodge em { font-style: normal; }
+.dodge.l { left: max(3vw, env(safe-area-inset-left)); }
+.dodge.r { right: max(3vw, env(safe-area-inset-right)); }
+.dodge.hit { transform: scale(0.9); background: rgba(22,21,26,0.12); }
