@@ -16,6 +16,9 @@ const DRAW_WINDOW = 0.24; // 出鞘 must be drawn this close to the blade arrivi
 const DODGE_WINDOW = 0.42;
 const SHEATHE_TIME = 0.55;
 const DRAW_DAMAGE = 5;
+// Includes the fast arm spring's visual lag: contact now occurs as the blade
+// crosses the opponent, rather than while it is still leaving the windup.
+const CUT_CONTACT = 0.117;
 const COVERS = { L: ['L', 'H'], R: ['R', 'H'], H: ['H'], D: ['D'] };
 const NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
@@ -464,7 +467,7 @@ export class Duel {
     if (this.time - this.lastCut < 0.13) return;
     this.lastCut = this.time;
     this.playCut(vx / len, vy / len);
-    this.later(0.1, () => this.resolveCut(sw, 1));
+    this.later(CUT_CONTACT, () => this.resolveCut(sw, 1));
   }
 
   playCut(ux, uy) {
@@ -507,8 +510,11 @@ export class Duel {
     this.stats.hits++;
     this.combo = idle ? 1 : this.combo + 1;
     this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
-    const c = this.view.project(this.enemy.chest(_v));
-    const at = closestOnSegment(sw.a, sw.b, c);
+    const chest = this.enemy.chest(_v);
+    const c = this.view.project(chest);
+    // Anchor the mark to the rendered weapon near the opponent, not to wherever
+    // the user's finger happened to be on the screen. Combat remains gesture-based.
+    const at = this.view.project(this.player.bladeClosestTo(chest, _w));
     at.x = clamp(at.x, c.x - this.fx.m * 0.1, c.x + this.fx.m * 0.1);
     at.y = clamp(at.y, c.y - this.fx.m * 0.18, c.y + this.fx.m * 0.14);
     this.fx.cut(sw.a, sw.b, at, big);
@@ -531,7 +537,7 @@ export class Duel {
     }
     if (E.hp <= 0) return this.kill();
     if (idle) {
-      E.guard = origin === 'H' ? 'H' : origin === 'L' ? 'L' : 'R';
+      E.guard = origin === 'H' || origin === 'D' ? origin : origin === 'L' ? 'L' : 'R';
       E.counterNext = Math.random() < 0.55;
       this.setState('flinch', 0.3);
     }
@@ -546,17 +552,20 @@ export class Duel {
     this.hints.draw = 0;
     this.anim.play([{ pose: PLAYER.drawCut, dur: 0.07 }, { pose: PLAYER.drawFollow, dur: 0.16, hold: 0.2 }], { back: 0.45, tag: 'draw' });
     this.sfx.draw(true);
-    this.hooks.hitstop(0.14);
-    this.hooks.slowmo(0.25, 0.7);
-    this.hooks.shake(0.7);
     this.hooks.draw?.();
-    const c = this.view.project(this.enemy.chest(_v));
-    // one long stroke straight through him: the flat draw sweeps left to right
-    this.fx.slash(c, Math.cos(0.2), Math.sin(0.2));
-    this.fx.text('出 鞘', this.fx.w / 2, this.fx.h * 0.22, { size: this.fx.m * 0.09, life: 1.3, hold: 0.7 });
     this.combo = 0;
-    this.hit(sw, { idle: false, origin: 'L', dmg: DRAW_DAMAGE, big: true });
-    if (E.state !== 'dead') this.setState('stagger', 1.0);
+    this.setState('stagger', 1.0);
+    // Let the sword actually leave the saya before freezing the impact frame.
+    this.later(0.085, () => {
+      if (this.over) return;
+      this.hooks.hitstop(0.14);
+      this.hooks.slowmo(0.25, 0.7);
+      this.hooks.shake(0.7);
+      const c = this.view.project(this.enemy.chest(_v));
+      this.fx.slash(c, Math.cos(0.2), Math.sin(0.2));
+      this.fx.text('出 鞘', this.fx.w / 2, this.fx.h * 0.22, { size: this.fx.m * 0.09, life: 1.3, hold: 0.7 });
+      this.hit(sw, { idle: false, origin: 'L', dmg: DRAW_DAMAGE, big: true });
+    });
   }
 
   kill() {

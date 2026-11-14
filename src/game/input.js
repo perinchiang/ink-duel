@@ -8,17 +8,25 @@ export class SwipeInput {
     this.el = el;
     this.h = h;
     this.active = null;
+    this.enabled = true;
     this.seq = 0;
     el.addEventListener('pointerdown', (e) => this.down(e));
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.up(e));
-    window.addEventListener('pointercancel', (e) => this.up(e));
+    window.addEventListener('pointercancel', (e) => {
+      if (this.active?.pid === e.pointerId) this.finish(this.active);
+    });
     window.addEventListener('keydown', (e) => {
-      if (e.repeat) return;
+      if (!this.enabled || e.repeat) return;
       const k = e.key.toLowerCase();
       if (k === 'a' || k === 'arrowleft') h.onDodge(-1);
       else if (k === 'd' || k === 'arrowright') h.onDodge(1);
     });
+  }
+
+  setEnabled(enabled) {
+    if (!enabled && this.active) this.finish(this.active);
+    this.enabled = enabled;
   }
 
   threshold() {
@@ -26,6 +34,7 @@ export class SwipeInput {
   }
 
   down(e) {
+    if (!this.enabled) return;
     if (e.target.closest && e.target.closest('[data-ui]')) return;
     if (this.active) return;
     e.preventDefault();
@@ -54,7 +63,8 @@ export class SwipeInput {
   up(e) {
     const a = this.active;
     if (!a || e.pointerId !== a.pid) return;
-    if (!a.committed) this.tryCommit(a, true);
+    a.pts.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    if (this.enabled && !a.committed) this.tryCommit(a, true);
     this.finish(a);
   }
 

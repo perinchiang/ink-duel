@@ -17,10 +17,15 @@ for (let i = 0; i < 32; i++) {
   }
   const tips = keys.map(p => p.hilt.map((v,j) => v + p.dir[j] * TIP));
   const sweep = (tips[2][0]-tips[0][0]) * -x + (tips[2][1]-tips[0][1]) * y;
-  assert.ok(sweep > 1.7 && sweep > Math.abs(tips[2][2]-tips[0][2]) * 3);
-  assert.ok(keys[1].dir[2] < 0.65);
+  assert.ok(sweep > 1.7, `direction ${i}: lateral sweep ${sweep}`);
+  assert.ok(tips[1][2] > Math.max(tips[0][2], tips[2][2]) + 0.3, `direction ${i}: forward contact arc`);
+  assert.ok(keys[1].dir[2] > 0.99, `direction ${i}: contact points toward opponent`);
+  for (const p of keys) {
+    assert.ok(Math.abs(p.dir[0] * y + p.dir[1] * x) < 1e-10, 'blade stays in swipe/forward plane');
+  }
+  if (Math.abs(y) < 1e-10) assert.ok(Math.max(...tips.map(t=>t[1])) - Math.min(...tips.map(t=>t[1])) < 0.03, 'horizontal cut stays level in XZ');
 }
-console.log('32 directions: two-handed grip, transverse blade sweep and tangent edge PASS');
+console.log('32 directions: two-handed grip, forward-arc blade sweep and tangent edge PASS');
 const browser = await chromium.launch({...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {channel:'chrome'}), timeout:15000, args:[`--use-angle=${process.env.ANGLE || 'metal'}`, '--enable-webgl']});
 const watchdog = setTimeout(() => browser.close(), 110000);
 try {
@@ -29,7 +34,7 @@ try {
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
   for (const [name,at] of [['idle',0.7],['windup',1.6],['impact',2],['follow',2.55]]) {
     for (const [view,cam] of [['front','-1.1,1.65,-3.6'],['side','3.8,1.65,0.7'],['back','-1,1.7,3.8'],['normal',null]]) {
-      await page.goto(`http://127.0.0.1:5190/?demo=cut&at=${at}${cam ? `&cam=${cam}&look=0,0.95,0` : '&cam=0.95,1.85,1.35&look=-0.5,1,-1.8'}`);
+      await page.goto(`http://127.0.0.1:5190/?demo=cut&at=${at}${cam ? `&cam=${cam}&look=0,0.95,0` : ''}`);
       await page.waitForFunction(()=>window.__ready);
       const result=await page.evaluate(async()=>{
         const p=__game.player;
@@ -38,7 +43,7 @@ try {
       });
       assert.ok(result.low > 0.85 && result.wrist > 0.999 && result.finite);
       assert.ok(Math.abs(result.tip-TIP)<1e-8);
-      await page.screenshot({path:`shots/hands-${name}-${view}.png`});
+      await page.screenshot({path:`/tmp/hands-${name}-${view}.png`});
     }
   }
   const motion = await page.evaluate(async () => {
@@ -72,7 +77,7 @@ try {
   await page.waitForFunction(()=>window.__ready);
   await page.evaluate(()=>__game.synthSwipe(216.87));
   await page.waitForTimeout(120);
-  await page.screenshot({path:'shots/hands-live-cut.png'});
+  await page.screenshot({path:'/tmp/hands-live-cut.png'});
   assert.deepEqual(errors,[]);
   console.log('16 phase/views, wrist alignment, tip length, live swipe and no page errors PASS');
 } finally {clearTimeout(watchdog); await browser.close();}

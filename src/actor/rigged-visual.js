@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { solveTwoBone } from './ik.js';
+import { solveClearArm } from './grip.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const Q = () => new THREE.Quaternion();
@@ -90,8 +91,8 @@ export class RiggedVisual {
         handQ.setFromUnitVectors(restFore, posedFore).multiply(d.chestQ).multiply(this.bind[side + 'Hand'].q);
       }
       // Grip centre is inside the palm, not at the wrist joint.
-      // Both palms sit on the same tsuka with the lower hand offset toward its pommel.
-      const offset = V(0, i === 0 ? 0.064 : 0.064 - 0.145, i === 0 ? 0.018 : -0.018).applyQuaternion(handQ);
+      // P.hL already includes grip spacing. Both palms need the same anatomical offset.
+      const offset = V(0, 0.064, i === 0 ? 0.018 : -0.018).applyQuaternion(handQ);
       const wrist = P['h' + suffix].clone().sub(offset);
       const shoulder = P['sh' + suffix];
       const elbow = V(), end = V();
@@ -100,7 +101,7 @@ export class RiggedVisual {
       // translations to its 29cm segments; allow slight extension at full reach
       // rather than moving the authoritative hilt or disconnecting the palm.
       const length = Math.max(0.29, reach / 1.98);
-      solveTwoBone(shoulder, wrist, length, length, V(i === 0 ? -0.55 : 0.55, -0.75, -0.35).applyQuaternion(d.chestQ), elbow, end);
+      solveClearArm(shoulder, wrist, length, length, i === 0 ? -1 : 1, P.hips, d.chestQ, elbow, end);
       this.aim(side + 'Arm', side + 'ForeArm', shoulder, elbow, d.chestQ);
       this.aim(side + 'ForeArm', side + 'Hand', elbow, wrist, d.chestQ);
       this.set(side + 'Hand', handQ, wrist);
