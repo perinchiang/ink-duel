@@ -36,13 +36,12 @@ const keyLight = new THREE.DirectionalLight(0xfff3dc, 2.5);
 keyLight.position.set(-3, 6, 4);
 scene.add(keyLight);
 
-// The two duellists face each other along Z. The camera sits behind the player's right
-// shoulder, so the player stands in the lower left and the opponent on the right; his
-// cuts travel across the space between them.
-const GAP = 2.15;
+// Keep both fighters on the same Z combat axis. View the open shoulder from -X,
+// rather than looking squarely into the player's turned back.
+const GAP = 1.7;
 const vec = (s, d) => (s ? new THREE.Vector3(...s.split(',').map(Number)) : d);
-const CAM = vec(params.get('cam'), fullBody ? new THREE.Vector3(2.6, 1.9, 3.5) : new THREE.Vector3(0.95, 1.85, 1.35));
-const LOOK = vec(params.get('look'), fullBody ? new THREE.Vector3(0, 0.85, -0.35) : new THREE.Vector3(-0.5, 1.0, -1.8));
+const CAM = vec(params.get('cam'), fullBody ? new THREE.Vector3(2.6, 1.9, 3.5) : new THREE.Vector3(-1.9, 1.55, 0.95));
+const LOOK = vec(params.get('look'), fullBody ? new THREE.Vector3(0, 0.85, -0.35) : new THREE.Vector3(0.1, 1.3, -0.85));
 
 const player = new Swordsman({ position: new THREE.Vector3(0, 0, 0), yaw: Math.PI, style: 'bun', palette: PALETTES.pale, name: 'you' });
 player.addTo(scene);
@@ -84,7 +83,8 @@ const view = {
 const cam = { shake: 0, dodgeT: 1, dodgeSide: 0, t: 0, push: 0, drawT: 1, base: CAM.clone(), look: LOOK.clone() };
 let hitstop = 0, timeScale = 1, slowT = 0;
 
-const dodgeUI = makeDodgeButtons($('ui'), (s) => duel.onDodge(s));
+let portraitPaused = false;
+const dodgeUI = makeDodgeButtons($('ui'), (s) => { if (!portraitPaused) duel.onDodge(s); });
 
 const duel = new Duel({
   enemy, player, fx, sfx, ground, view,
@@ -101,7 +101,7 @@ const duel = new Duel({
   },
 });
 
-new SwipeInput(app, {
+const input = new SwipeInput(app, {
   onSwipe: (sw) => duel.onSwipe(sw),
   onStroke: (id, pts, done, circled) => fx.stroke(id, pts, done, circled),
   onDodge: (s) => duel.onDodge(s),
@@ -134,13 +134,16 @@ function resize() {
   renderer.setPixelRatio(dpr);
   renderer.setSize(W, H, false);
   const aspect = W / H;
+  portraitPaused = H > W;
+  $('rotate-prompt').hidden = !portraitPaused;
+  $('ui').inert = portraitPaused;
+  input.setEnabled(!portraitPaused);
   camera.aspect = aspect;
-  // keep both duellists framed on narrower screens: widen and pull back a little
-  const narrow = clamp((1.6 - aspect) / 1.0, 0, 1);
-  camera.fov = 46 + narrow * 30;
-  const tall = clamp((1 - aspect) / 0.55, 0, 1);
-  cam.base.copy(CAM).add(_p.set(-0.25 * narrow - 0.25 * tall, 0.15 * narrow + 0.55 * tall, 0.5 * narrow + 1.3 * tall));
-  cam.look.copy(LOOK).add(_p.set(0.3 * narrow + 0.2 * tall, -0.05 * narrow - 0.1 * tall, 0));
+  // Preserve the close shoulder framing on wide phones; only widen for compact
+  // landscape windows, never pull the camera away into a full-body view.
+  camera.fov = 46 + clamp((1.7 - aspect) / 0.7, 0, 1) * 16;
+  cam.base.copy(CAM);
+  cam.look.copy(LOOK);
   placeCamera();
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
@@ -192,6 +195,7 @@ function autopilot() {
 }
 let synthId = 1e6;
 function synthSwipe(angleDeg, cy = 0.5) {
+  if (portraitPaused) return;
   const a = (angleDeg * Math.PI) / 180;
   const L = Math.min(W, H) * 0.3;
   const c = { x: W * 0.55, y: H * cy };
@@ -212,6 +216,14 @@ let frames = 0;
 function frame(now) {
   const realDt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  // Freeze the whole simulation, including autopilot, hitstop and camera timers.
+  // Keep RAF alive so orientation changes resume without accumulating elapsed time.
+  if (portraitPaused) {
+    renderer.render(scene, camera);
+    if (visualSettled) window.__ready = true;
+    requestAnimationFrame(frame);
+    return;
+  }
   let dt = realDt * timeScale;
   if (slowT > 0) {
     slowT -= realDt;

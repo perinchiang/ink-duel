@@ -54,3 +54,18 @@ html, body {
 .dodge.l { left: max(3vw, env(safe-area-inset-left)); }
 .dodge.r { right: max(3vw, env(safe-area-inset-right)); }
 .dodge.hit { transform: scale(0.9); background: rgba(22,21,26,0.12); }
+
+#rotate-prompt {
+  position: absolute; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: radial-gradient(ellipse at center, #f3ecdd, var(--paper));
+  color: var(--ink); font-family: var(--kai); text-align: center; cursor: default;
+  touch-action: none; padding: 24px;
+}
+#rotate-prompt[hidden] { display: none; }
+.rotate-mark { display: block; font-size: 64px; color: var(--red); line-height: 1; }
+.rotate-note h1 { font-size: 30px; font-weight: normal; letter-spacing: 0.2em; }
+.rotate-note p { font-size: 18px; letter-spacing: 0.15em; }
+.rotate-note small { opacity: 0.55; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .dodge { width: 58px; height: 58px; font-size: 13px; bottom: max(12px, env(safe-area-inset-bottom)); }
+}
