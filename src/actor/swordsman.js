@@ -6,7 +6,8 @@
 // world position and facing.
 import * as THREE from 'three';
 import { inkMaterial, outlineMaterial, inkPart, washTexture } from '../render/ink.js';
-import { makeSword, TIP } from './sword.js';
+import { makeSword, TIP, BLADE, GRIP_BOTTOM } from './sword.js';
+import { fitGrip, solveClearArm } from './grip.js';
 import { Ribbon } from './ribbon.js';
 import { solveTwoBone, placeSegment } from './ik.js';
 import { PoseSpring } from './spring.js';
@@ -18,7 +19,7 @@ import { legGeometry, solveLeg, shapeLeg } from './legs.js';
 const UPPER = 0.29;
 const FORE = 0.29;
 const HIP_H = 0.95;
-const SCAB_LEN = 0.9;
+const SCAB_LEN = BLADE + 0.06;
 
 const _v = new THREE.Vector3();
 const _a = new THREE.Vector3();
@@ -289,7 +290,8 @@ export class Swordsman {
     }
 
     // saya sits at the left hip; the mouth is also the anchor for the iai off-hand.
-    const sh = p.sheath;
+    const sh = THREE.MathUtils.clamp(p.sheath, 0, 1);
+    const two = THREE.MathUtils.clamp(p.two, 0, 1) * (1 - sh);
     P.mouth.copy(P.hips).add(_v.set(0.2, 0.0, 0.1).applyQuaternion(hq));
     P.axis.set(0.16, -0.62, -0.77).applyQuaternion(hq).normalize();
     this.scabbard.position.copy(P.mouth);
@@ -313,10 +315,8 @@ export class Swordsman {
       _c.set(0, 1, 0).applyQuaternion(hq);
       _x.lerp(_c, sh);
     }
-    // Cut-only, spring-blended pole keeps the sleeve off the gripping hand.
-    // Guard, parry, draw and sheath retain their original elbow pole.
-    const elbowZ = this.style === 'hat' ? -0.35 : p.elbowR;
-    solveTwoBone(P.shR, _a, UPPER, FORE, _b.set(-0.55, -0.75, elbowZ).applyQuaternion(q), P.elR, P.hR);
+    if (two > 0.99) fitGrip(_a, _y, P.shR, P.shL, HAND_SPACING, (UPPER + FORE) * 0.985, P.hips, q);
+    solveClearArm(P.shR, _a, UPPER, FORE, -1, P.hips, q, P.elR, P.hR);
     placeSegment(this.upperR, P.shR, P.elR);
     placeSegment(this.foreR, P.elR, P.hR);
     this.handR.position.copy(P.hR);
@@ -349,11 +349,11 @@ export class Swordsman {
 
     // left hand: sword-finger, the pommel for two-handed cuts, or the scabbard
     _a.set(P.root.x + p.lhand[0], p.lhand[1], P.root.z + p.lhand[2]);
-    if (p.two > 0) {
+    if (two > 0) {
       // The left palm is not an independent target: it is always the lower end of
       // the tsuka, so both IK chains follow the same sword transform.
       _b.copy(P.hR).addScaledVector(swordY, -HAND_SPACING);
-      _a.lerp(_b, p.two);
+      _a.lerp(_b, two);
     }
     if (sh > 0) {
       // During iai the left palm pins the saya mouth; drawCut overrides this target
@@ -361,7 +361,7 @@ export class Swordsman {
       _b.copy(P.mouth).addScaledVector(P.axis, 0.07);
       _a.lerp(_b, sh);
     }
-    solveTwoBone(P.shL, _a, UPPER, FORE, _b.set(0.55, -0.75, -0.35).applyQuaternion(q), P.elL, P.hL);
+    solveClearArm(P.shL, _a, UPPER, FORE, 1, P.hips, q, P.elL, P.hL);
     placeSegment(this.upperL, P.shL, P.elL);
     placeSegment(this.foreL, P.elL, P.hL);
     this.handL.position.copy(P.hL);
@@ -401,7 +401,7 @@ export class Swordsman {
       _a.copy(this.bunAt).add(_v.set(0.02, -0.01, 0)).applyQuaternion(headQ).add(P.head).applyMatrix4(W);
       this.ribbons[1].update(_a, dt, camPos, this.wind);
     }
-    _a.copy(P.hR).addScaledVector(swordY, -0.1).applyMatrix4(W);
+    _a.copy(P.hR).addScaledVector(swordY, GRIP_BOTTOM).applyMatrix4(W);
     this.tassel.update(_a, dt, camPos, this.wind);
   }
 

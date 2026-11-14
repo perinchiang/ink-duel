@@ -30,8 +30,6 @@ export function makePose(o = {}) {
     hilt: [-0.14, 1.12, 0.36],
     dir: [0, 0.6, 0.8],
     edge: [0, 1, 0],
-    lhand: 'hilt',
-    two: 1,
     head: [0, 0],
     sheath: 0,
     elbowR: -0.35, // forward/back component of the right elbow pole
@@ -125,6 +123,7 @@ export const PLAYER = {
   parry: {
     L: makePose({ two: 1, hilt: [0.04, 1.44, 0.42], dir: [0.48, 0.8, 0.36], edge: [1, 0.2, 0.1], twist: 0.36, crouch: 0.13, lean: 0.06 }),
     R: makePose({ two: 1, hilt: [-0.28, 1.44, 0.4], dir: [-0.4, 0.84, 0.36], edge: [-1, 0.2, 0.1], twist: -0.16, crouch: 0.13, lean: 0.06 }),
+    D: makePose({ hilt: [0, 0.94, 0.43], dir: [0.7, 0.7, 0.14], edge: [0, -1, 0], crouch: 0.28, twist: 0.3 }),
     O: makePose({ two: 1, hilt: [-0.3, 1.66, 0.32], dir: [0.98, 0.18, 0.1], edge: [0, 1, 0], crouch: 0.17, lean: -0.02, head: [-0.1, 0] }),
   },
   // 归鞘: the blade in the scabbard, right hand on the hilt across the body, weight low
@@ -143,55 +142,23 @@ export const PLAYER = {
 export function cutPoses(ux, uy) {
   const length = Math.hypot(ux, uy) || 1;
   const lx = -ux / length, ly = uy / length;
-  const C = [-0.17, 1.18, 0.28];
-  // Sweep in the lateral/vertical plane with slight forward clearance.
-  // Edge is the rotational tangent, never a parallel-to-blade hint.
-  const blade = (angle) => ({
-    dir: [lx * Math.sin(angle) - ly * Math.cos(angle), ly * Math.sin(angle) + lx * Math.cos(angle), 0.3],
-    edge: [lx * Math.cos(angle) + ly * Math.sin(angle), ly * Math.cos(angle) - lx * Math.sin(angle), 0],
+  // Sweep through forward Z in the swipe's plane. A horizontal swipe never
+  // becomes an overhead wheel: at contact the blade reaches into the opponent.
+  const blade = angle => ({
+    dir: [lx * Math.sin(angle), ly * Math.sin(angle), Math.cos(angle)],
+    edge: [lx * Math.cos(angle), ly * Math.cos(angle), -Math.sin(angle)],
   });
-  const windup = makePose({
-    hilt: [C[0] - lx * 0.16, C[1] - ly * 0.28 + 0.1, 0.22],
-    ...blade(-1.3),
-    elbowR: 0.8,
-    two: 1,
-    lhand: [0.29, 0.76, -0.08],
-    twist: -lx * 0.52 + 0.05,
-    pelvis: -lx * 0.22,
-    weight: [0.035, -0.08],
-    crouch: 0.16,
-    lean: -0.02,
-    root: [0, -0.02],
-  });
-  const impact = makePose({
-    hilt: [C[0] - 0.18 + lx * 0.08, C[1] + 0.26 + ly * 0.1, 0.3],
-    ...blade(0.15),
-    elbowR: 0.8,
-    two: 1,
-    lhand: [0.29, 0.75, -0.1],
-    twist: lx * 0.12 + 0.12,
-    pelvis: lx * 0.3 + 0.08,
-    weight: [-0.045, 0.07],
-    crouch: 0.15,
-    lean: 0.16,
-    root: [0, 0.12],
-  });
-  const follow = makePose({
-    // Finish across the shoulder line instead of disappearing behind the chest.
-    // Keep lateral reach compact; the blade still completes the same transverse arc.
-    hilt: [C[0] + lx * 0.55, C[1] + 0.22 + ly * 0.1, 0.18],
-    ...blade(1.65),
-    elbowR: 0.8,
-    two: 1,
-    lhand: [0.29, 0.73, -0.12],
-    twist: lx * 0.48 + 0.12,
-    pelvis: lx * 0.24 + 0.08,
-    weight: [-0.045, 0.06],
-    crouch: 0.19,
-    lean: 0.22,
-    root: [0, 0.14],
-  });
-  return [windup, impact, follow];
+  return [
+    makePose({ hilt: [-lx * 0.14, 1.26 - ly * 0.24, 0.42], ...blade(-1.05),
+      twist: -lx * 0.28, pelvis: -lx * 0.12, crouch: ly > 0.5 ? 0.24 : 0.1,
+      weight: [0, 0.02], lean: 0.03, root: [0, 0] }),
+    makePose({ hilt: [0, 1.24, 0.56], ...blade(0),
+      twist: 0, pelvis: lx * 0.12, crouch: 0.12, weight: [0, 0.1],
+      lean: 0.12, root: [0, 0.22] }),
+    makePose({ hilt: [lx * 0.18, 1.24 + ly * 0.23, 0.44], ...blade(1.05),
+      twist: lx * 0.3, pelvis: lx * 0.2, crouch: ly < -0.5 ? 0.23 : 0.14,
+      weight: [0, 0.08], lean: 0.12, root: [0, 0.26] }),
+  ];
 }
 
 export function dodgePose(side) {

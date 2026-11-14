@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { inkPart } from '../render/ink.js';
 
 export const GRIP = 0.085;
-export const BLADE = 0.84;
+export const GRIP_BOTTOM = -0.205; // accommodates the lower palm at -0.145
+export const BLADE = 0.96;
 export const TIP = GRIP + 0.02 + BLADE;
 
 export function makeSword({ bladeMat, darkMat, lineMat }) {
@@ -32,11 +33,12 @@ export function makeSword({ bladeMat, darkMat, lineMat }) {
   guard.rotation.x = Math.PI / 2;
   g.add(guard);
 
-  const gripGeo = new THREE.CylinderGeometry(0.014, 0.016, GRIP * 2, 8);
+  const gripGeo = new THREE.CylinderGeometry(0.018, 0.02, GRIP - GRIP_BOTTOM, 8);
+  gripGeo.translate(0, (GRIP + GRIP_BOTTOM) / 2, 0);
   g.add(inkPart(gripGeo, darkMat, lineMat));
 
   const pommelGeo = new THREE.SphereGeometry(0.02, 10, 8);
-  pommelGeo.translate(0, -GRIP - 0.012, 0);
+  pommelGeo.translate(0, GRIP_BOTTOM - 0.012, 0);
   g.add(inkPart(pommelGeo, darkMat, lineMat));
   return g;
 }
