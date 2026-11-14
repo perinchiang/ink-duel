@@ -9,7 +9,7 @@ import { inkMaterial, outlineMaterial, inkPart, washTexture } from '../render/in
 import { makeSword, TIP, BLADE, GRIP_BOTTOM } from './sword.js';
 import { fitGrip, solveClearArm } from './grip.js';
 import { Ribbon } from './ribbon.js';
-import { solveTwoBone, placeSegment } from './ik.js';
+import { placeSegment } from './ik.js';
 import { PoseSpring } from './spring.js';
 import { makePose, copyPose, HAND_SPACING } from './poses.js';
 import { torsoPattern, skirtPattern, sleevePattern } from './patterns.js';
@@ -236,6 +236,13 @@ export class Swordsman {
 
   tipWorld(out = new THREE.Vector3()) {
     return this.toWorld(out.copy(this.pts.tip));
+  }
+
+  bladeClosestTo(worldPoint, out = new THREE.Vector3()) {
+    const a = this.toWorld(this.pts.hR.clone());
+    const d = this.tipWorld().sub(a);
+    const t = THREE.MathUtils.clamp(worldPoint.clone().sub(a).dot(d) / d.lengthSq(), 0, 1);
+    return out.copy(a).addScaledVector(d, t);
   }
 
   chest(out = new THREE.Vector3()) {
