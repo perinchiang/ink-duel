@@ -5,12 +5,13 @@
 //   hilt   – where the right hand grips the sword
 //   dir    – blade direction (grip → tip)
 //   edge   – the way the cutting edge faces (the flat is perpendicular to it)
-//   lhand  – left hand target (剑指 sword-finger), or 'hilt' for a two-hand grip
+//   lhand  – free hand target for iai; otherwise derived from the two-handed grip
 //   sheath – 0..1, pulls the sword into the scabbard at the left hip
 //   root   – [x, z] step offset; crouch lowers the hips; lean / twist / tilt the torso
 //
-// A jian is held point-forward: at rest the point is toward the opponent's throat.
-// When the point does drop toward the ground the arm hangs straight, never crooked.
+// Hanmi stance: left foot forward, right foot back. Both hands share the tsuka.
+export const HAND_SPACING = 0.145;
+export const STANCE_TWIST = 0.62;
 
 function norm(v) {
   const l = Math.hypot(v[0], v[1], v[2]) || 1;
@@ -22,15 +23,15 @@ export function makePose(o = {}) {
     root: [0, 0],
     crouch: 0.08,
     lean: 0.05,
-    twist: 0,
-    pelvis: o.pelvis ?? (o.twist || 0) * 0.45,
-    weight: [0, 0], // pelvis translation relative to stance/root, independent of chest
+    twist: STANCE_TWIST,
+    pelvis: o.pelvis ?? (o.twist ?? STANCE_TWIST) * 0.65,
+    weight: [0.015, 0.065], // pelvis translation relative to stance/root, independent of chest
     tilt: 0,
     hilt: [-0.14, 1.12, 0.36],
     dir: [0, 0.6, 0.8],
     edge: [0, 1, 0],
-    lhand: [0.29, 0.76, -0.08],
-    two: 0,
+    lhand: 'hilt',
+    two: 1,
     head: [0, 0],
     sheath: 0,
     elbowR: -0.35, // forward/back component of the right elbow pole
@@ -42,9 +43,8 @@ export function makePose(o = {}) {
   p.hilt = [...p.hilt];
   p.dir = norm(p.dir);
   p.edge = norm(p.edge);
-  if (p.lhand === 'hilt') {
-    p.two = 1;
-    p.lhand = [p.hilt[0] - p.dir[0] * 0.1, p.hilt[1] - p.dir[1] * 0.1, p.hilt[2] - p.dir[2] * 0.1];
+  if (p.lhand === 'hilt' || p.two === 1) {
+    p.lhand = p.hilt.map((v, i) => v - p.dir[i] * HAND_SPACING);
   } else p.lhand = [...p.lhand];
   return p;
 }
@@ -69,9 +69,9 @@ export function blendPose(a, b, t, out) {
 
 export const POSES = {
   // 按剑: point resting toward the ground ahead; free hand low beside the hip
-  rest: makePose({ hilt: [-0.25, 0.83, 0.1], dir: [-0.06, -0.7, 0.71], edge: [0, 0.7, 0.7], lhand: [0.29, 0.78, -0.08], lean: 0.03, crouch: 0.02, head: [0.06, 0] }),
+  rest: makePose({ hilt: [-0.02, 1.04, 0.34], dir: [0, 0.18, 1], edge: [0, -1, 0.18], lean: 0.04, crouch: 0.055, head: [0.06, 0] }),
   // 中段: point forward, knees soft, free hand relaxed behind the hip
-  guardM: makePose({ hilt: [-0.2, 1.02, 0.34], dir: [-0.26, 0.12, 0.96], edge: [0, 1, 0], lhand: [0.29, 0.76, -0.08], crouch: 0.11, twist: 0.14, lean: 0.06 }),
+  guardM: makePose({ hilt: [-0.02, 1.08, 0.36], dir: [0, 0.32, 1], edge: [0, -1, 0.32], crouch: 0.08, lean: 0.06 }),
   // guards: the side the blade covers is the side your cut will be stopped on
   guardL: makePose({ hilt: [-0.25, 1.16, 0.34], dir: [-0.12, 0.86, 0.5], edge: [-1, 0, 0.2], lhand: [0.24, 1.34, 0.12], twist: -0.12, crouch: 0.09, lean: 0.05 }),
   guardR: makePose({ hilt: [0.05, 1.16, 0.36], dir: [0.24, 0.84, 0.48], edge: [1, 0, 0.2], lhand: [0.3, 1.0, -0.06], twist: 0.3, crouch: 0.09, lean: 0.05 }),
@@ -116,10 +116,10 @@ export const PLAYER = {
     O: makePose({ hilt: [-0.3, 1.66, 0.32], dir: [0.98, 0.18, 0.1], edge: [0, 1, 0], lhand: [0.24, 1.7, 0.34], crouch: 0.17, lean: -0.02, head: [-0.1, 0] }),
   },
   // 归鞘: the blade in the scabbard, right hand on the hilt across the body, weight low
-  sheathed: makePose({ sheath: 1, crouch: 0.22, lean: 0.16, twist: 0.5, root: [0, -0.05], head: [0.05, -0.45] }),
+  sheathed: makePose({ two: 0, sheath: 1, crouch: 0.22, lean: 0.16, twist: 0.5, root: [0, -0.05], head: [0.05, -0.45] }),
   // 出鞘斩: a flat draw-cut that carries the whole body through
-  drawCut: makePose({ hilt: [-0.16, 1.28, 0.62], dir: [-0.55, 0.05, 0.83], edge: [-1, 0, 0.1], lhand: [0.26, 1.06, 0.05], root: [0, 0.6], crouch: 0.22, lean: 0.26, twist: 0.38 }),
-  drawFollow: makePose({ hilt: [-0.48, 1.3, 0.24], dir: [-0.92, 0.2, -0.18], edge: [-0.5, 0, -1], lhand: [0.3, 1.06, 0.02], root: [0, 0.62], crouch: 0.18, lean: 0.14, twist: 0.6, head: [0, -0.15] }),
+  drawCut: makePose({ two: 0, hilt: [-0.16, 1.28, 0.62], dir: [-0.55, 0.05, 0.83], edge: [-1, 0, 0.1], lhand: [0.26, 1.06, 0.05], root: [0, 0.6], crouch: 0.22, lean: 0.26, twist: 0.38 }),
+  drawFollow: makePose({ two: 0, hilt: [-0.48, 1.3, 0.24], dir: [-0.92, 0.2, -0.18], edge: [-0.5, 0, -1], lhand: [0.3, 1.06, 0.02], root: [0, 0.62], crouch: 0.18, lean: 0.14, twist: 0.6, head: [0, -0.15] }),
 };
 
 /**

@@ -10,7 +10,7 @@ import { makeSword, TIP } from './sword.js';
 import { Ribbon } from './ribbon.js';
 import { solveTwoBone, placeSegment } from './ik.js';
 import { PoseSpring } from './spring.js';
-import { makePose, copyPose } from './poses.js';
+import { makePose, copyPose, HAND_SPACING } from './poses.js';
 import { torsoPattern, skirtPattern, sleevePattern } from './patterns.js';
 import { ease } from '../core/noise.js';
 import { legGeometry, solveLeg, shapeLeg } from './legs.js';
@@ -138,8 +138,9 @@ export class Swordsman {
 
     this.legs = [];
     if (style !== 'hat') {
-      this.feet[0].off.set(-0.18, 0, 0.28);
-      this.feet[1].off.set(0.19, 0, -0.24);
+      // Hanmi footwork: left foot leads toward the opponent, right foot trails.
+      this.feet[0].off.set(-0.18, 0, -0.24);
+      this.feet[1].off.set(0.19, 0, 0.28);
       for (const f of this.feet) {
         f.pos.copy(f.off);
         const geometry = legGeometry();
@@ -288,6 +289,8 @@ export class Swordsman {
 
     // sword: blend the key pose toward the scabbard by `sheath`
     const sh = p.sheath;
+    // Once home, the blade is genuinely inside the saya; the draw poses reveal it again.
+    this.sword.visible = sh < 0.82;
     _a.set(P.root.x + p.hilt[0], p.hilt[1], P.root.z + p.hilt[2]);
     _y.set(p.dir[0], p.dir[1], p.dir[2]).normalize();
     _x.set(p.edge[0], p.edge[1], p.edge[2]);
@@ -335,7 +338,9 @@ export class Swordsman {
     // left hand: sword-finger, the pommel for two-handed cuts, or the scabbard
     _a.set(P.root.x + p.lhand[0], p.lhand[1], P.root.z + p.lhand[2]);
     if (p.two > 0) {
-      _b.copy(P.hR).addScaledVector(swordY, -0.1);
+      // The left palm is not an independent target: it is always the lower end of
+      // the tsuka, so both IK chains follow the same sword transform.
+      _b.copy(P.hR).addScaledVector(swordY, -HAND_SPACING);
       _a.lerp(_b, p.two);
     }
     if (sh > 0) {
