@@ -131,8 +131,8 @@ export const PLAYER = {
   sheathed: makePose({ two: 0, sheath: 1, crouch: 0.22, lean: 0.16, twist: 0.5, root: [0, -0.05], head: [0.05, -0.45] }),
   // 出鞘斩: a flat draw-cut that carries the whole body through
   // 居合见切: right hand explodes forward while the left hand rips the saya back.
-  drawCut: makePose({ two: 0, hilt: [-0.18, 1.3, 0.64], dir: [-0.58, 0.04, 0.82], edge: [-1, 0, 0.1], lhand: [0.38, 1.02, -0.28], root: [0, 0.6], crouch: 0.25, lean: 0.28, twist: 0.42 }),
-  drawFollow: makePose({ two: 0, hilt: [-0.52, 1.32, 0.26], dir: [-0.94, 0.18, -0.16], edge: [-0.5, 0, -1], lhand: [0.5, 1.04, -0.38], root: [0, 0.64], crouch: 0.2, lean: 0.16, twist: 0.68, head: [0, -0.15] }),
+  drawCut: makePose({ two: 0, hilt: [-0.18, 1.3, 0.64], dir: [-0.58, 0.04, 0.82], edge: [-1, 0, 0.1], lhand: [0.3, 1.0, 0.08], root: [0, 0.6], crouch: 0.25, lean: 0.28, twist: 0.42 }),
+  drawFollow: makePose({ two: 0, hilt: [-0.52, 1.32, 0.26], dir: [-0.94, 0.18, -0.16], edge: [-0.5, 0, -1], lhand: [0.37, 1.02, 0.1], root: [0, 0.64], crouch: 0.2, lean: 0.16, twist: 0.68, head: [0, -0.15] }),
 };
 
 /**

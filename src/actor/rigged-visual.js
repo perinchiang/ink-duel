@@ -90,7 +90,8 @@ export class RiggedVisual {
         handQ.setFromUnitVectors(restFore, posedFore).multiply(d.chestQ).multiply(this.bind[side + 'Hand'].q);
       }
       // Grip centre is inside the palm, not at the wrist joint.
-      const offset = V(0, 0.064, i === 0 ? 0.018 : -0.018).applyQuaternion(handQ);
+      // Both palms sit on the same tsuka with the lower hand offset toward its pommel.
+      const offset = V(0, i === 0 ? 0.064 : 0.064 - 0.145, i === 0 ? 0.018 : -0.018).applyQuaternion(handQ);
       const wrist = P['h' + suffix].clone().sub(offset);
       const shoulder = P['sh' + suffix];
       const elbow = V(), end = V();

@@ -27,8 +27,10 @@ export function makeSword({ bladeMat, darkMat, lineMat }) {
   g.add(inkPart(bladeGeo, bladeMat, lineMat));
 
   const guardGeo = new THREE.TorusGeometry(0.055, 0.012, 6, 14);
-  guardGeo.translate(0, GRIP + 0.01, 0);
-  g.add(inkPart(guardGeo, darkMat, lineMat));
+  const guard = inkPart(guardGeo, darkMat, lineMat);
+  guard.position.y = GRIP + 0.01;
+  guard.rotation.x = Math.PI / 2;
+  g.add(guard);
 
   const gripGeo = new THREE.CylinderGeometry(0.014, 0.016, GRIP * 2, 8);
   g.add(inkPart(gripGeo, darkMat, lineMat));
