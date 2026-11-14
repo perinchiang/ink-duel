@@ -13,7 +13,9 @@ export class SwipeInput {
     el.addEventListener('pointerdown', (e) => this.down(e));
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.up(e));
-    window.addEventListener('pointercancel', (e) => this.up(e));
+    window.addEventListener('pointercancel', (e) => {
+      if (this.active?.pid === e.pointerId) this.finish(this.active);
+    });
     window.addEventListener('keydown', (e) => {
       if (!this.enabled || e.repeat) return;
       const k = e.key.toLowerCase();
@@ -61,7 +63,8 @@ export class SwipeInput {
   up(e) {
     const a = this.active;
     if (!a || e.pointerId !== a.pid) return;
-    if (!a.committed) this.tryCommit(a, true);
+    a.pts.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    if (this.enabled && !a.committed) this.tryCommit(a, true);
     this.finish(a);
   }
 

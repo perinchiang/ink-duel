@@ -12,14 +12,18 @@ try {
     await page.waitForFunction(() => window.__ready);
     const result = await page.evaluate(() => {
       const d = __game.player, v = d.visual;
-      const hand = v.bones.RightHand;
-      const centre = hand.position.clone().set(0, 0.064 / 1.75, 0.018 / 1.75);
-      d.root.worldToLocal(hand.localToWorld(centre));
-      return { status: d.visualStatus, gripError: centre.distanceTo(d.pts.hR), finite: Object.values(v.bones).every(b => b.matrixWorld.elements.every(Number.isFinite)), hidden: !d.torso.visible, sword: d.sword.visible, enemy: __game.enemy.torso.visible };
+      const gripErrors = ['Right', 'Left'].map((side, i) => {
+        const hand = v.bones[side + 'Hand'];
+        const centre = hand.position.clone().set(0, 0.064 / 1.75, (i === 0 ? 0.018 : -0.018) / 1.75);
+        d.root.worldToLocal(hand.localToWorld(centre));
+        return centre.distanceTo(d.pts[i === 0 ? 'hR' : 'hL']);
+      });
+      return { status: d.visualStatus, gripErrors, finite: Object.values(v.bones).every(b => b.matrixWorld.elements.every(Number.isFinite)), hidden: !d.torso.visible, sword: d.sword.visible, enemy: __game.enemy.torso.visible };
     });
     assert.equal(result.status, 'rigged');
-    assert.ok(result.gripError < 1e-5, JSON.stringify(result));
-    assert.ok(result.finite && result.hidden && result.sword && result.enemy);
+    assert.ok(result.gripErrors.every(error => error < 1e-5), JSON.stringify(result));
+    assert.equal(result.sword, pose !== 'sheathed', `${pose}: sword visibility`);
+    assert.ok(result.finite && result.hidden && result.enemy);
     console.log(pose, result);
   }
   await page.goto(`${base}?ppose=rest`);

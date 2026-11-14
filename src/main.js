@@ -40,7 +40,7 @@ scene.add(keyLight);
 // rather than looking squarely into the player's turned back.
 const GAP = 1.7;
 const vec = (s, d) => (s ? new THREE.Vector3(...s.split(',').map(Number)) : d);
-const CAM = vec(params.get('cam'), fullBody ? new THREE.Vector3(2.6, 1.9, 3.5) : new THREE.Vector3(-1.9, 1.55, 0.95));
+const CAM = vec(params.get('cam'), fullBody ? new THREE.Vector3(2.6, 1.9, 3.5) : new THREE.Vector3(-1.9, 1.85, 0.5));
 const LOOK = vec(params.get('look'), fullBody ? new THREE.Vector3(0, 0.85, -0.35) : new THREE.Vector3(0.1, 1.3, -0.85));
 
 const player = new Swordsman({ position: new THREE.Vector3(0, 0, 0), yaw: Math.PI, style: 'bun', palette: PALETTES.pale, name: 'you' });

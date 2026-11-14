@@ -118,6 +118,10 @@ export class Swordsman {
     this.upperL = add(inkPart(upperGeo, M.limb, line));
     this.foreR = add(inkPart(foreGeo, M.sleeve, line));
     this.foreL = add(inkPart(foreGeo, M.sleeve, line));
+    // End cuffs before the palm: full-length flared sleeves swallowed the tsuka
+    // when the hands overlapped in an over-shoulder view.
+    this.foreR.scale.set(0.82, 0.72, 0.82);
+    this.foreL.scale.set(0.82, 0.72, 0.82);
     const handGeo = style === 'hat' ? new THREE.SphereGeometry(0.037, 12, 10)
       : new THREE.CapsuleGeometry(0.028, 0.045, 4, 10);
     if (style !== 'hat') handGeo.scale(1, 1, 0.8);
