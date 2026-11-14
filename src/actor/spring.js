@@ -13,6 +13,7 @@ const LAYOUT = [
   ['head', 2, 'head'],
   ['two', 1, 'arm'],
   ['hilt', 3, 'arm'],
+  ['elbowR', 1, 'arm'],
   ['dir', 3, 'arm'],
   ['edge', 3, 'arm'],
   ['lhand', 3, 'arm'],

@@ -33,6 +33,7 @@ export function makePose(o = {}) {
     two: 0,
     head: [0, 0],
     sheath: 0,
+    elbowR: -0.35, // forward/back component of the right elbow pole
     ...o,
   };
   p.root = [...p.root];
@@ -48,7 +49,7 @@ export function makePose(o = {}) {
   return p;
 }
 
-const SCALARS = ['crouch', 'lean', 'twist', 'pelvis', 'tilt', 'two', 'sheath'];
+const SCALARS = ['crouch', 'lean', 'twist', 'pelvis', 'tilt', 'two', 'sheath', 'elbowR'];
 const VECTORS = ['root', 'weight', 'hilt', 'dir', 'edge', 'lhand', 'head'];
 
 export function copyPose(src, out = makePose()) {
@@ -139,6 +140,7 @@ export function cutPoses(ux, uy) {
   const windup = makePose({
     hilt: [C[0] - lx * 0.16, C[1] - ly * 0.28 + 0.1, 0.22],
     ...blade(-1.3),
+    elbowR: 0.8,
     lhand: [0.29, 0.76, -0.08],
     twist: -lx * 0.52 + 0.05,
     pelvis: -lx * 0.22,
@@ -150,6 +152,7 @@ export function cutPoses(ux, uy) {
   const impact = makePose({
     hilt: [C[0] - 0.18 + lx * 0.08, C[1] + 0.26 + ly * 0.1, 0.3],
     ...blade(0.15),
+    elbowR: 0.8,
     lhand: [0.29, 0.75, -0.1],
     twist: lx * 0.12 + 0.12,
     pelvis: lx * 0.3 + 0.08,
@@ -159,8 +162,11 @@ export function cutPoses(ux, uy) {
     root: [0, 0.12],
   });
   const follow = makePose({
-    hilt: [C[0] + lx * 0.56, C[1] + ly * 0.22, 0.18],
+    // Finish across the shoulder line instead of disappearing behind the chest.
+    // Keep lateral reach compact; the blade still completes the same transverse arc.
+    hilt: [C[0] + lx * 0.55, C[1] + 0.22 + ly * 0.1, 0.18],
     ...blade(1.65),
+    elbowR: 0.8,
     lhand: [0.29, 0.73, -0.12],
     twist: lx * 0.48 + 0.12,
     pelvis: lx * 0.24 + 0.08,

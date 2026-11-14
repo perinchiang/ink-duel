@@ -298,7 +298,10 @@ export class Swordsman {
       _c.set(0, 1, 0).applyQuaternion(hq);
       _x.lerp(_c, sh);
     }
-    solveTwoBone(P.shR, _a, UPPER, FORE, _b.set(-0.55, -0.75, -0.35).applyQuaternion(q), P.elR, P.hR);
+    // Cut-only, spring-blended pole keeps the sleeve off the gripping hand.
+    // Guard, parry, draw and sheath retain their original elbow pole.
+    const elbowZ = this.style === 'hat' ? -0.35 : p.elbowR;
+    solveTwoBone(P.shR, _a, UPPER, FORE, _b.set(-0.55, -0.75, elbowZ).applyQuaternion(q), P.elR, P.hR);
     placeSegment(this.upperR, P.shR, P.elR);
     placeSegment(this.foreR, P.elR, P.hR);
     this.handR.position.copy(P.hR);

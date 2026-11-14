@@ -17,7 +17,7 @@ for (let i = 0; i < 32; i++) {
   assert.ok(keys[1].dir[2] < 0.65);
 }
 console.log('32 directions: low offhand, transverse blade sweep and tangent edge PASS');
-const browser = await chromium.launch({channel:'chrome', timeout:15000, args:[`--use-angle=${process.env.ANGLE || 'metal'}`, '--enable-webgl']});
+const browser = await chromium.launch({...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {channel:'chrome'}), timeout:15000, args:[`--use-angle=${process.env.ANGLE || 'metal'}`, '--enable-webgl']});
 const watchdog = setTimeout(() => browser.close(), 110000);
 try {
   const page = await browser.newPage({viewport:{width:1280,height:900}});

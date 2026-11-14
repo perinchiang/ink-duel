@@ -15,7 +15,7 @@ for (const [x, y] of [[1,0], [-1,0], [0,1], [0,-1], [-0.8,-0.6]]) {
   for (const p of cutPoses(x,y)) assert.ok(Object.values(p).flat().every(Number.isFinite));
 }
 console.log('Pose copy/blend/spring and cut directions PASS');
-const browser = await chromium.launch({ channel: 'chrome', timeout: 15000, args: [`--use-angle=${process.env.ANGLE || 'metal'}`, '--enable-unsafe-swiftshader', '--enable-webgl'] });
+const browser = await chromium.launch({ ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {channel:'chrome'}), timeout: 15000, args: [`--use-angle=${process.env.ANGLE || 'metal'}`, '--enable-unsafe-swiftshader', '--enable-webgl'] });
 const watchdog = setTimeout(() => { console.error('Browser test exceeded 90s budget'); browser.close(); }, 90000);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
