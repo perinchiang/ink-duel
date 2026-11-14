@@ -139,8 +139,8 @@ export class Swordsman {
     this.legs = [];
     if (style !== 'hat') {
       // Hanmi footwork: left foot leads toward the opponent, right foot trails.
-      this.feet[0].off.set(-0.18, 0, -0.24);
-      this.feet[1].off.set(0.19, 0, 0.28);
+      this.feet[0].off.set(-0.18, 0, 0.28);
+      this.feet[1].off.set(0.19, 0, -0.24);
       for (const f of this.feet) {
         f.pos.copy(f.off);
         const geometry = legGeometry();
@@ -164,6 +164,13 @@ export class Swordsman {
     chape.scale(1, 1, 0.6);
     chape.translate(0, SCAB_LEN - 0.03, 0);
     this.scabbard.add(inkPart(chape, M.blade, line));
+    // Small breathing ink motes mark the saya mouth during the low iai wait.
+    this.sayaMotes = add(new THREE.Group());
+    for (let i = 0; i < 3; i++) {
+      const mote = inkPart(new THREE.SphereGeometry(0.012 + i * 0.003, 8, 6), M.dark, null);
+      mote.position.set((i - 1) * 0.035, 0.045 + (i % 2) * 0.02, 0.035);
+      this.sayaMotes.add(mote);
+    }
 
     this.sword = add(makeSword({ bladeMat: M.blade, darkMat: M.dark, lineMat: line }));
 
@@ -281,14 +288,19 @@ export class Swordsman {
       this.hat.quaternion.copy(headQ);
     }
 
-    // scabbard hangs from the left of the belt
+    // saya sits at the left hip; the mouth is also the anchor for the iai off-hand.
+    const sh = p.sheath;
     P.mouth.copy(P.hips).add(_v.set(0.2, 0.0, 0.1).applyQuaternion(hq));
     P.axis.set(0.16, -0.62, -0.77).applyQuaternion(hq).normalize();
     this.scabbard.position.copy(P.mouth);
     this.scabbard.quaternion.setFromUnitVectors(UP, P.axis);
+    this.sayaMotes.position.copy(P.mouth);
+    this.sayaMotes.quaternion.copy(hq);
+    const motePulse = 0.82 + 0.18 * Math.sin(this.time * 5.5);
+    this.sayaMotes.visible = this.style !== 'hat' && sh > 0.42;
+    this.sayaMotes.scale.setScalar(motePulse);
 
     // sword: blend the key pose toward the scabbard by `sheath`
-    const sh = p.sheath;
     // Once home, the blade is genuinely inside the saya; the draw poses reveal it again.
     this.sword.visible = sh < 0.82;
     _a.set(P.root.x + p.hilt[0], p.hilt[1], P.root.z + p.hilt[2]);
@@ -344,6 +356,8 @@ export class Swordsman {
       _a.lerp(_b, p.two);
     }
     if (sh > 0) {
+      // During iai the left palm pins the saya mouth; drawCut overrides this target
+      // with an explicit rearward pull once the sword leaves the sheath.
       _b.copy(P.mouth).addScaledVector(P.axis, 0.07);
       _a.lerp(_b, sh);
     }

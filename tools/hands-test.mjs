@@ -2,13 +2,17 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { cutPoses, POSES } from '../src/actor/poses.js';
 import { TIP } from '../src/actor/sword.js';
-for (const p of [POSES.rest, POSES.guardM]) assert.ok(p.lhand[1] < 0.85);
+for (const p of [POSES.rest, POSES.guardM]) {
+  assert.equal(p.two, 1);
+  assert.ok(p.lhand[1] > 0.85);
+}
 for (let i = 0; i < 32; i++) {
   const x = Math.cos(i * Math.PI / 16), y = Math.sin(i * Math.PI / 16);
   const keys = cutPoses(x, y);
   for (const p of keys) {
     assert.ok(Object.values(p).flat().every(Number.isFinite));
-    assert.ok(p.lhand[1] < 0.85 && p.lhand[2] < 0);
+    assert.equal(p.two, 1);
+    assert.ok(p.lhand[1] > 0.85);
     assert.ok(Math.abs(p.dir.reduce((s, v, j) => s + v * p.edge[j], 0)) < 1e-10);
   }
   const tips = keys.map(p => p.hilt.map((v,j) => v + p.dir[j] * TIP));
@@ -16,7 +20,7 @@ for (let i = 0; i < 32; i++) {
   assert.ok(sweep > 1.7 && sweep > Math.abs(tips[2][2]-tips[0][2]) * 3);
   assert.ok(keys[1].dir[2] < 0.65);
 }
-console.log('32 directions: low offhand, transverse blade sweep and tangent edge PASS');
+console.log('32 directions: two-handed grip, transverse blade sweep and tangent edge PASS');
 const browser = await chromium.launch({...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {channel:'chrome'}), timeout:15000, args:[`--use-angle=${process.env.ANGLE || 'metal'}`, '--enable-webgl']});
 const watchdog = setTimeout(() => browser.close(), 110000);
 try {
@@ -32,7 +36,7 @@ try {
         const forward=p.pts.hR.clone().set(0,1,0).applyQuaternion(p.handR.quaternion);
         return {low:p.pts.hL.y, wrist:forward.dot(p.pts.hR.clone().sub(p.pts.elR).normalize()), tip:p.pts.tip.distanceTo(p.pts.hR), finite:p.sword.quaternion.toArray().every(Number.isFinite)};
       });
-      assert.ok(result.low < 0.85 && result.wrist > 0.999 && result.finite);
+      assert.ok(result.low > 0.85 && result.wrist > 0.999 && result.finite);
       assert.ok(Math.abs(result.tip-TIP)<1e-8);
       await page.screenshot({path:`shots/hands-${name}-${view}.png`});
     }

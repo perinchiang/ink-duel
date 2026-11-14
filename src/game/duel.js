@@ -5,10 +5,10 @@ import { Animator } from '../actor/animator.js';
 import { ease, angDiff, clamp, noise1 } from '../core/noise.js';
 import * as THREE from 'three';
 
-const DIRS = ['L', 'R', 'O'];
+const DIRS = ['L', 'R', 'O', 'D'];
 const PARRY_TOL = 38;
 // Each attack reads as one clear stroke on screen; the parry swipe points back along it.
-export const ANGLE = { L: 135, O: 90, R: 45 };
+export const ANGLE = { L: 135, O: 90, R: 45, D: -90 };
 const PARRY_WINDOW = 0.36; // how early before impact a parry may be drawn
 const PERFECT_WINDOW = 0.12;
 const DRAW_TOL = 40;
@@ -16,7 +16,7 @@ const DRAW_WINDOW = 0.24; // 出鞘 must be drawn this close to the blade arrivi
 const DODGE_WINDOW = 0.42;
 const SHEATHE_TIME = 0.55;
 const DRAW_DAMAGE = 5;
-const COVERS = { L: ['L', 'U'], R: ['R', 'U'], H: ['H'] };
+const COVERS = { L: ['L', 'H'], R: ['R', 'H'], H: ['H'], D: ['D'] };
 const NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -53,7 +53,7 @@ export class Duel {
       lastDirs: [], phase2: false, counterNext: false,
     };
     copyPose(POSES.rest, this.pose);
-    this.P = { hp: 5, max: 5, parry: null, dodgeAt: -9, dodgeSide: 0, sheathed: false, sheathing: false, invuln: 0 };
+    this.P = { hp: 5, max: 5, parry: null, dodgeAt: -9, dodgeSide: 0, sheathed: false, sheathing: false, invuln: 0, jolt: 0, joltSide: 1 };
     this.combo = 0;
     this.stats = { perfect: 0, parry: 0, maxCombo: 0, hits: 0, draws: 0, sheaths: 0, start: 0 };
     this.hints = { parry: 3, sheathe: 2, draw: 2 };
@@ -85,7 +85,7 @@ export class Duel {
   toIdle(newGuard = true) {
     const E = this.E;
     if (newGuard) {
-      const options = ['L', 'R', 'H'].filter((g) => g !== E.guard || Math.random() < 0.3);
+      const options = ['L', 'R', 'H', 'D'].filter((g) => g !== E.guard || Math.random() < 0.3);
       E.guard = pick(options);
     }
     // a sheathed opponent makes him wary: he waits, then tests you
@@ -144,6 +144,7 @@ export class Duel {
     E.t += dt;
     E.hurt = Math.max(0, E.hurt - dt * 5);
     E.jolt = Math.max(0, E.jolt - dt * 7);
+    this.P.jolt = Math.max(0, this.P.jolt - dt * 8);
     E.flash = Math.max(0, E.flash - dt * 9);
     this.P.invuln = Math.max(0, this.P.invuln - dt);
     if (E.chipDelay > 0) E.chipDelay -= dt;
@@ -283,6 +284,13 @@ export class Duel {
     if (!this.over || this.P.hp > 0) {
       this.playerPose.crouch += Math.sin(this.time * 1.9 + 1) * 0.008;
     }
+    if (this.P.jolt > 0) {
+      const j = this.P.jolt;
+      this.playerPose.root[1] -= 0.07 * j;
+      this.playerPose.lean -= 0.12 * j;
+      this.playerPose.twist += 0.16 * j * this.P.joltSide;
+      this.playerPose.crouch += 0.06 * j;
+    }
 
     this.updateTelegraph();
   }
@@ -327,6 +335,8 @@ export class Duel {
     const clash = this.tel.center || this.clashPoint();
     if (P.parry && P.parry.dir === A.dir && gap <= PARRY_WINDOW) {
       const perfect = gap <= PERFECT_WINDOW;
+      P.jolt = 1;
+      P.joltSide = A.dir === 'L' ? -1 : 1;
       const mine = this.view.project(this.player.bladeMid(_w));
       const at = { x: clash.x * 0.6 + mine.x * 0.4, y: clash.y * 0.6 + mine.y * 0.4 };
       this.fx.burst(at.x, at.y, perfect);
@@ -404,7 +414,7 @@ export class Duel {
     P.sheathing = true;
     P.parry = null;
     // the blade sweeps up and round to the left hip, then slides home
-    const sweep = makePose({ hilt: [0.1, 1.5, 0.3], dir: [0.6, 0.5, -0.62], edge: [0, 1, 0], lhand: [0.22, 1.0, 0.08], crouch: 0.15, twist: -0.1 });
+    const sweep = makePose({ two: 1, hilt: [0.1, 1.5, 0.3], dir: [0.6, 0.5, -0.62], edge: [0, 1, 0], crouch: 0.2, twist: 0.35 });
     this.anim.play([{ pose: sweep, dur: 0.2, ease: 'inOut' }, { pose: PLAYER.sheathed, dur: 0.3, ease: 'inOut' }], { then: 'hold', tag: 'sheathe' });
     this.sfx.swish(0.5);
     this.later(SHEATHE_TIME, () => {
@@ -468,7 +478,8 @@ export class Duel {
     if (this.over || E.state === 'dead') return;
     const vx = sw.dx, vy = -sw.dy;
     const len = Math.hypot(vx, vy) || 1;
-    const origin = vy < -0.55 * len ? 'H' : vy > 0.55 * len ? 'U' : vx > 0 ? 'L' : 'R';
+    // Screen-up cuts read as high (上段); screen-down cuts read as low (下段).
+    const origin = vy > 0.55 * len ? 'H' : vy < -0.55 * len ? 'D' : vx > 0 ? 'L' : 'R';
     if (E.state === 'idle' || E.state === 'flinch' || E.state === 'intro') {
       if (E.state !== 'idle' || COVERS[E.guard].includes(origin)) return this.blocked(vx);
       return this.hit(sw, { idle: true, origin, dmg });
